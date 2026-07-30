@@ -1,21 +1,26 @@
 {
   "name": "local-model-advisor",
-  "displayName": "local-model-advisor",
-  "description": "Find the best local AI models as per your hardware",
+  "displayName": "Local Model Advisor",
+  "description": "Scan your CPU, RAM and GPU — get ranked local AI models (GGUF) that actually fit your machine, with one-click Ollama run commands.",
   "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.000.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": ["onCommand:local-model-advisor.scanHardware"],
+  "publisher": "vihaan-raut",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": { "color": "#05060a", "theme": "dark" },
+  "engines": { "vscode": "^1.120.0" },
+  "categories": ["Machine Learning", "Other"],
+  "keywords": ["llm", "local ai", "ollama", "gguf", "huggingface", "hardware", "model advisor"],
+  "repository": { "type": "git", "url": "https://github.com/VihaanR/local-model-advisor" },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "local-model-advisor.scanHardware",
-        "title": "Local Model Advisor: Scan Hardware"
+        "title": "Local Model Advisor: Scan Hardware & Recommend Models"
+      },
+      {
+        "command": "local-model-advisor.setHuggingFaceToken",
+        "title": "Local Model Advisor: Set Hugging Face Token"
       }
     ]
   },
@@ -31,7 +36,8 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-   "
+    "test": "vscode-test",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
