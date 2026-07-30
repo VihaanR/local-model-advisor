@@ -11,6 +11,7 @@ media/icon.svg
 .yarnrc
 esbuild.js
 vsc-extension-quickstart.md
+CLAUDE.md
 code_design.md
 vitest.config.ts
 .vscode-test.mjs
