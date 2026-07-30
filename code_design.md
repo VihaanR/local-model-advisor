@@ -10,32 +10,33 @@
 
 ---
 
-## BUILD STATUS — updated 2026-07-30
+## BUILD STATUS — updated 2026-07-30 (fix wave 1 landed)
 
 ### 🔴 RESUME HERE (next session)
 
-The single next action is: **fix Part D's 1 Critical + 6 Important findings, then re-verify.** A fix wave for exactly these was drafted and dispatched once already but was interrupted mid-flight by the user (no code was changed by that attempt — it was cancelled before any tool ran). Nothing has touched those findings since. To resume:
+**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, and committed locally as `ccb4613` — but NOT YET PUSHED to `origin`.** The single next action is either (a) push `ccb4613` to `origin master`, or (b) do the two human-only tasks (D4) first and push both together. Nothing else in Part D blocks release.
 
-1. Read **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** in full — it has the complete, specific fix list (file names, root causes, exact fixes) for C1 and I1–I6.
-2. Work through C1 → I1 → I2 together first (they're one coherent `AdvisorPanel`/`runScan` lifecycle refactor — see Part D's Recommendation #1), then I3–I6.
-3. Follow TDD for every logic change (existing suite: `src/models/estimate.test.ts`, `score.test.ts`, `fetch.test.ts`, `src/hardware.test.ts` — 20 tests, all currently green; keep them green and add tests per I6).
-4. Commit in logical groups with `fix:`/`test:`/`refactor:` prefixes, not one giant commit.
-5. Re-run the full verification suite (`npm run compile`, `npm run test:unit`, `npm test`, `npx vsce package`) and update the tables below.
-6. Push to `origin master` (remote is already configured — see Repo State below). **Do not** add any Claude/AI co-author attribution to commits — this project's convention (set by the human) is commits authored solely as the human, no `Co-Authored-By` trailers.
-7. Only after C1+I1–I6 are fixed and verified: do the two human-only tasks in Part D (D4) and optionally Task 11.
+What happened: a fix-wave implementer subagent was dispatched with a fully-specified brief (`.superpowers/sdd/fix-wave-1-brief.md`, still on disk, gitignored) covering all 7 items with exact code. It implemented all 7, flagged one deviation (the brief's own `MOE_ACTIVE_PATTERN` regex for I6 didn't satisfy the brief's own second test case for reversed MoE active/total ordering — verified independently by the controller with a scratch script before accepting), and committed as `ccb4613`. An independent task-reviewer subagent then re-ran `npm run check-types`/`lint`/`test:unit`/`compile` itself (not trusting the implementer's report), verified all 7 items against the brief item-by-item, confirmed the commit has no AI/Claude attribution, and confirmed zero scope creep. Verdict: **approved, task complete.**
 
-Minors (D3) and the process lesson (D6) are optional polish — do not block on them.
+To resume:
+
+1. `git log -1 ccb4613` to confirm this is still `HEAD` (should be, tree was clean before and after).
+2. Decide: push now, or do D4's two human-only tasks first and push together. Either is fine — D4 no longer has any code dependency on this fix wave.
+3. `git push origin master`.
+4. Then D4 (screenshot + local `.vsix` install sanity check) if not already done, then optionally Task 11.
+
+Minors (D3) and the process lesson (D6) are still optional polish — do not block on them. D6's `constants.ts` recommendation was already implemented as part of fix wave 1 (see Item 1 in the brief) — the rest of D6 (a lifecycle checklist in `.claude/skills/neon-webview-ui`) is still open but genuinely optional.
 
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
-- **Local branch:** `master`, tracking `origin/master`, currently in sync (verify with `git status` / `git log origin/master..HEAD` before assuming — push again after any new local commits).
+- **Local branch:** `master`, tracking `origin/master`, currently **1 commit ahead** (`ccb4613`, fix wave 1 — not yet pushed). Verify with `git log origin/master..HEAD` before assuming otherwise.
 - **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
 - **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
 
 **Tasks 1–10: ✅ COMPLETE.** All implemented, independently reviewed per task, and committed. The extension runs end to end: scan → tiered recommendations → neon webview.
 
-Verified by the controller after Task 10 (state as of commit `367cdf6`; re-run after the Part D fix wave):
+Verified by the controller after Task 10 (state as of commit `367cdf6`):
 
 | Check | Result |
 |---|---|
@@ -44,9 +45,20 @@ Verified by the controller after Task 10 (state as of commit `367cdf6`; re-run a
 | `npm test` (real Electron host) | 1 passing, both commands registered |
 | `npx vsce package` | `local-model-advisor-0.1.0.vsix`, 10 files, no dev files leaked |
 
-**Task 11: ⏸️ DEFERRED** — needs a GitHub repo (now exists, see Repo State above — so this blocker is partially cleared), a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it. Do not start it before Part D's Critical+Important fixes land.
+Re-verified independently by the task reviewer after fix wave 1 (state as of commit `ccb4613`):
 
-**⚠️ NOT shippable yet.** A final whole-branch review found **1 Critical + 6 Important + 11 Minor** issues that Tasks 1–10 did not cover — most notably a webview state bug that makes the UI unrecoverable after an ordinary tab switch. See **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** at the end of this document. **None of these fixes have been applied yet** — this is the actual next work. Fix Critical + Important before any publish.
+| Check | Result |
+|---|---|
+| `npm run check-types` | clean |
+| `npm run lint` | clean |
+| `npm run test:unit` | **5 files, 37 tests, all passing** (was 4/20 — fix wave added `state.test.ts` + expanded `fetch.test.ts`/`estimate.test.ts`) |
+| `npm run compile` | clean (full pipeline) |
+| `npm test` (real Electron host) | passing (trusted from implementer report — reviewer skipped re-running it deliberately, it launches a real VS Code download and is slow/flaky in a sandbox; `src/test/extension.test.ts` is untouched in the diff) |
+| `npx vsce package` | not re-run since `367cdf6` — do this again before any publish, since `catalog.json` and other bundled files changed |
+
+**Task 11: ⏸️ DEFERRED** — needs a GitHub repo (now exists, see Repo State above — so this blocker is partially cleared), a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it.
+
+**Ship-blocking code work is now DONE.** Fix wave 1 closed all 7 Critical+Important findings from the final whole-branch review (webview lifecycle, disposal safety, concurrency guard, constants unification, error classification, catalog query quality, test coverage). See **[Part D](#part-d--outstanding-work-post-review)** for the full original finding list (kept for record) — D1/D2 are now resolved, D3 (11 Minors) and D6 (process lesson) remain optional, D4 (2 human-only tasks) and Task 11 remain the only real gates before publishing.
 
 ### Task completion map
 
@@ -64,12 +76,13 @@ Verified by the controller after Task 10 (state as of commit `367cdf6`; re-run a
 | 10 — Marketplace assets & docs | ✅ | `5922818` (+ `367cdf6` exclude CLAUDE.md) |
 | 11 — CI + publish | ⏸️ deferred | — |
 | *(post-review)* Final whole-branch review | ✅ ran, found 18 findings | — (review only, no fix commits yet) |
-| *(post-review)* Fix wave for Part D findings | ❌ not started | — |
 | *(post-review)* docs: status update in this file | ✅ | `fb038a5` |
 | *(post-review)* chore: broaden .gitignore | ✅ | `dc4eee6` |
 | *(post-review)* Push to GitHub remote | ✅ | — (push, not a commit) |
+| *(post-review)* docs: resume-here + repo-state update | ✅ | `de95372` |
+| *(post-review)* **Fix wave 1: C1 + I1–I6 (all 7 ship-blocking findings)** | ✅ implemented + independently reviewed, approved | `ccb4613` — **not yet pushed** |
 
-Full commit range so far: `c136d34` (baseline) .. `dc4eee6` (latest), 15 commits, all on `master`, all pushed to `origin`.
+Full commit range so far: `c136d34` (baseline) .. `ccb4613` (latest), 17 commits, all on `master`. **16 of 17 are pushed to `origin`; `ccb4613` is local-only, waiting on a push decision.**
 
 Deviations from this plan that were made deliberately during execution, and why:
 
@@ -1739,14 +1752,16 @@ A final whole-branch review (base `c136d34` → head `367cdf6`) surfaced defects
 
 Ship gate: fix **Critical + Important (7 items)** before publishing. Minors are optional polish.
 
-## D1 — Critical (1) — blocks release
+**STATUS: D1 + D2 (all 7 ship-blocking items) fixed in fix wave 1, commit `ccb4613`, independently reviewed and approved. Kept below for historical record of what was wrong and why — not a to-do list anymore.**
+
+## D1 — Critical (1) — ✅ FIXED in `ccb4613`
 
 **C1. Webview strands on a fake "Scanning hardware" radar after a tab switch.**
 `src/panel.ts` omits `retainContextWhenHidden`, so VS Code destroys the webview DOM when hidden and reloads the HTML when shown again. On reload `src/webview/main.ts` runs `renderLoading()` from fresh module state and nothing ever re-posts — there is no `onDidChangeViewState` listener, no ready handshake, and no `setState`/`getState`. `renderLoading()` also renders **no Rescan button** (unlike `renderError()`), so the only escape is closing the tab. Triggered by clicking any other editor tab and clicking back — users will hit this on first use.
 
 Fix: cache the last `ExtensionToWebview` in `AdvisorPanel` and re-post it on `onDidChangeViewState` when visible; add `retainContextWhenHidden: true`; give the loading state a Rescan button as a backstop.
 
-## D2 — Important (6) — fix before release
+## D2 — Important (6) — ✅ FIXED in `ccb4613`
 
 | # | Issue | Where |
 |---|---|---|
