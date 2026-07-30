@@ -1,5 +1,31 @@
+# Build output
 out
 dist
-node_modules
-.vscode-test/
 *.vsix
+
+# Dependencies
+node_modules
+
+# VS Code extension test runner (downloads a full VS Code build here)
+.vscode-test/
+
+# Test / coverage artifacts
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env / secrets — this project never commits API keys, but guard anyway
+.env
+.env.local
+.env.*.local
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+
+# Claude Code session scratch (task briefs, review diffs, progress ledger)
+# .claude/skills/ is intentionally NOT ignored — those are checked-in project skills
+.superpowers/
