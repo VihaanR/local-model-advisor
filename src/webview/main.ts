@@ -1,39 +1,36 @@
 import type {
-	CatalogSource, ExtensionToWebview, FitTier, HardwareInfo, ScoredModel, WebviewToExtension,
+	ExtensionToWebview, FitTier, ScoredModel, WebviewToExtension,
 } from '../models/types';
+import { reduce, initialState, fallbackBannerText, type WebviewState } from './state';
 
 declare function acquireVsCodeApi(): { postMessage(msg: WebviewToExtension): void };
 const vscode = acquireVsCodeApi();
 
 const app = document.getElementById('app') as HTMLElement;
 
-let hardware: HardwareInfo | null = null;
-let models: ScoredModel[] = [];
-let source: CatalogSource = 'live';
+let state: WebviewState = initialState;
 let filter: FitTier | 'all' = 'all';
 
 const TIER_LABEL: Record<FitTier, string> = { gpu: 'GPU TURBO', hybrid: 'HYBRID', cpu: 'CPU OK', none: '—' };
 
 window.addEventListener('message', (event: MessageEvent<ExtensionToWebview>) => {
-	const msg = event.data;
-	switch (msg.type) {
-		case 'scanning':
+	state = reduce(state, event.data);
+	render();
+});
+
+function render(): void {
+	switch (state.status) {
+		case 'loading':
 			renderLoading();
 			break;
-		case 'hardware':
-			hardware = msg.hardware;
-			renderLoading();
-			break;
-		case 'models':
-			models = msg.models;
-			source = msg.source;
+		case 'results':
 			renderResults();
 			break;
 		case 'error':
-			renderError(msg.message);
+			renderError();
 			break;
 	}
-});
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K, className?: string, text?: string
@@ -50,7 +47,9 @@ function header(): HTMLElement {
 	return wrap;
 }
 
-function hardwareGrid(hw: HardwareInfo): HTMLElement {
+function hardwareGrid(): HTMLElement {
+	const hw = state.hardware;
+	if (!hw) { return el('div'); }
 	const grid = el('div', 'hw-grid');
 	const card = (label: string, value: string, unit?: string) => {
 		const c = el('div', 'hw-card');
@@ -73,25 +72,26 @@ function hardwareGrid(hw: HardwareInfo): HTMLElement {
 
 function renderLoading(): void {
 	app.replaceChildren(header());
-	if (hardware) { app.append(hardwareGrid(hardware)); }
+	if (state.hardware) { app.append(hardwareGrid()); }
 	const wrap = el('div', 'radar-wrap');
-	wrap.append(el('div', 'radar'), el('div', 'radar-label', hardware ? 'Querying model index' : 'Scanning hardware'));
+	wrap.append(el('div', 'radar'), el('div', 'radar-label', state.hardware ? 'Querying model index' : 'Scanning hardware'));
 	app.append(wrap);
+	app.append(rescanButton(state.scanning));
 }
 
-function renderError(message: string): void {
+function renderError(): void {
 	app.replaceChildren(header());
-	if (hardware) { app.append(hardwareGrid(hardware)); }
-	app.append(el('div', 'error-box', `SIGNAL LOST — ${message}`));
-	app.append(rescanButton());
+	if (state.hardware) { app.append(hardwareGrid()); }
+	app.append(el('div', 'error-box', `SIGNAL LOST — ${state.errorMessage}`));
+	app.append(rescanButton(state.scanning));
 }
 
 function renderResults(): void {
 	app.replaceChildren(header());
-	if (hardware) { app.append(hardwareGrid(hardware)); }
+	if (state.hardware) { app.append(hardwareGrid()); }
 
-	if (source === 'fallback') {
-		app.append(el('div', 'banner', 'Offline mode — showing bundled catalog (Hugging Face unreachable)'));
+	if (state.source === 'fallback') {
+		app.append(el('div', 'banner', fallbackBannerText(state.reason)));
 	}
 
 	const chips = el('div', 'chips');
@@ -103,7 +103,7 @@ function renderResults(): void {
 	}
 	app.append(chips);
 
-	const visible = models.filter((m) => filter === 'all' || m.tier === filter);
+	const visible = state.models.filter((m: ScoredModel) => filter === 'all' || m.tier === filter);
 	const list = el('div', 'model-list');
 	visible.forEach((m, i) => {
 		const row = el('div', `model-row tier-${m.tier}`);
@@ -138,13 +138,14 @@ function renderResults(): void {
 	app.append(el('div', 'footnote',
 		'Sizes assume Q4 quantization (~0.6 GB per billion params). GPU TURBO = fully fits in VRAM. ' +
 		'HYBRID = partial GPU offload. CPU OK = fits in system RAM. Detected VRAM can be inaccurate on some Windows drivers.'));
-	app.append(rescanButton());
+	app.append(rescanButton(state.scanning));
 }
 
-function rescanButton(): HTMLElement {
-	const btn = el('button', 'scan-btn', 'Rescan');
+function rescanButton(disabled: boolean): HTMLElement {
+	const btn = el('button', 'scan-btn', disabled ? 'Scanning…' : 'Rescan');
+	btn.disabled = disabled;
 	btn.addEventListener('click', () => vscode.postMessage({ type: 'rescan' }));
 	return btn;
 }
 
-renderLoading();
+render();

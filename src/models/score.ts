@@ -1,8 +1,6 @@
 import type { FitTier, HardwareInfo, ModelRecommendation, ScoredModel } from './types';
+import { CTX_HEADROOM_GB, CPU_OVERHEAD_GB, OS_RESERVE_FRACTION } from './constants';
 
-const CTX_HEADROOM_GB = 0.8;     // KV-cache/context room on top of weights
-const CPU_OVERHEAD_GB = 2;       // runtime + context when running on CPU
-const OS_RESERVE_FRACTION = 0.25; // leave a quarter of RAM to the OS
 const MAX_RESULTS = 12;
 
 const TIER_WEIGHT: Record<FitTier, number> = { gpu: 3000, hybrid: 2000, cpu: 1000, none: 0 };

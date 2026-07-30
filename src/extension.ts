@@ -37,14 +37,18 @@ function handleWebviewMessage(context: vscode.ExtensionContext, message: Webview
 }
 
 async function runScan(context: vscode.ExtensionContext, panel: AdvisorPanel): Promise<void> {
+	const generation = panel.beginScan();
 	panel.post({ type: 'scanning' });
 	try {
 		const hardware = await scanHardware();
+		if (!panel.isCurrentScan(generation)) { return; }
 		panel.post({ type: 'hardware', hardware });
 		const token = await getHfToken(context);
-		const { models, source } = await getRecommendations(hardware, { token });
-		panel.post({ type: 'models', models, source });
+		const { models, source, reason } = await getRecommendations(hardware, { token });
+		if (!panel.isCurrentScan(generation)) { return; }
+		panel.post({ type: 'models', models, source, reason });
 	} catch (err) {
+		if (!panel.isCurrentScan(generation)) { return; }
 		panel.post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
 	}
 }

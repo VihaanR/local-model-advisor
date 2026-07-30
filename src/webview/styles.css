@@ -142,6 +142,7 @@ body::after {
 	animation: pulse 2.4s ease-in-out infinite;
 }
 .scan-btn:hover { background: rgba(0, 240, 255, 0.12); }
+.scan-btn:disabled { opacity: 0.4; cursor: default; animation: none; box-shadow: none; }
 @keyframes pulse {
 	0%, 100% { box-shadow: 0 0 6px rgba(0, 240, 255, 0.4); }
 	50% { box-shadow: 0 0 18px rgba(0, 240, 255, 0.8), 0 0 48px rgba(0, 240, 255, 0.25); }

@@ -26,10 +26,12 @@ export interface ScoredModel extends ModelRecommendation {
 
 export type CatalogSource = 'live' | 'fallback';
 
+export type FetchFailureReason = 'network' | 'auth' | 'rate-limit' | 'server' | 'unknown';
+
 export type ExtensionToWebview =
 	| { type: 'scanning' }
 	| { type: 'hardware'; hardware: HardwareInfo }
-	| { type: 'models'; models: ScoredModel[]; source: CatalogSource }
+	| { type: 'models'; models: ScoredModel[]; source: CatalogSource; reason?: FetchFailureReason }
 	| { type: 'error'; message: string };
 
 export type WebviewToExtension =

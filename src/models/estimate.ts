@@ -1,4 +1,11 @@
+import { Q4_GB_PER_B } from './constants';
+
 const MOE_PATTERN = /(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*b\b/i;
+// "NNB-ANNB" MoE naming (total-B params, then active-B params): capture the total.
+const MOE_ACTIVE_PATTERN = /(\d+(?:\.\d+)?)\s*b-a\d+(?:\.\d+)?\s*b\b/i;
+// Same convention with segments reversed in the model name (e.g. "...-A3B-30B-...");
+// capture the total, which now trails the "A<active>B" marker instead of leading it.
+const MOE_ACTIVE_REVERSED_PATTERN = /a\d+(?:\.\d+)?\s*b-(\d+(?:\.\d+)?)\s*b\b/i;
 const SINGLE_PATTERN = /(\d+(?:\.\d+)?)\s*b\b/i;
 
 /** Billions of parameters parsed from a model id, or null if the name carries no size. */
@@ -7,6 +14,14 @@ export function parseParamCount(modelId: string): number | null {
 	const moe = modelId.match(MOE_PATTERN);
 	if (moe) {
 		return parseInt(moe[1], 10) * parseFloat(moe[2]);
+	}
+	const moeActive = modelId.match(MOE_ACTIVE_PATTERN);
+	if (moeActive) {
+		return parseFloat(moeActive[1]);
+	}
+	const moeActiveReversed = modelId.match(MOE_ACTIVE_REVERSED_PATTERN);
+	if (moeActiveReversed) {
+		return parseFloat(moeActiveReversed[1]);
 	}
 	const single = modelId.match(SINGLE_PATTERN);
 	if (single) {
@@ -17,5 +32,5 @@ export function parseParamCount(modelId: string): number | null {
 
 /** Approximate on-disk/in-memory size at Q4 quantization: ~0.6 GB per billion params. */
 export function estimateSizeGB(paramsB: number): number {
-	return Math.round(paramsB * 0.6 * 10) / 10;
+	return Math.round(paramsB * Q4_GB_PER_B * 10) / 10;
 }

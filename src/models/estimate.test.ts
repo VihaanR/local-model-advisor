@@ -20,6 +20,12 @@ describe('parseParamCount', () => {
 	it('returns null when no size is present', () => {
 		expect(parseParamCount('microsoft/phi-4-gguf')).toBeNull();
 	});
+	it('parses MoE "total-B-active-B" names, taking the total not the active count', () => {
+		expect(parseParamCount('Qwen/Qwen3-Coder-30B-A3B-Instruct-GGUF')).toBe(30);
+	});
+	it('is not order-dependent: active-params segment before the total also parses correctly', () => {
+		expect(parseParamCount('Qwen/Qwen3-A3B-30B-Coder-GGUF')).toBe(30);
+	});
 });
 
 describe('estimateSizeGB', () => {
