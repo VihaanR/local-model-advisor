@@ -12,9 +12,30 @@
 
 ## BUILD STATUS — updated 2026-07-30
 
-**Tasks 1–10: ✅ COMPLETE.** All implemented, independently reviewed per task, and committed (13 commits, `c136d34`..`367cdf6`, working tree clean). The extension runs end to end: scan → tiered recommendations → neon webview.
+### 🔴 RESUME HERE (next session)
 
-Verified by the controller after Task 10:
+The single next action is: **fix Part D's 1 Critical + 6 Important findings, then re-verify.** A fix wave for exactly these was drafted and dispatched once already but was interrupted mid-flight by the user (no code was changed by that attempt — it was cancelled before any tool ran). Nothing has touched those findings since. To resume:
+
+1. Read **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** in full — it has the complete, specific fix list (file names, root causes, exact fixes) for C1 and I1–I6.
+2. Work through C1 → I1 → I2 together first (they're one coherent `AdvisorPanel`/`runScan` lifecycle refactor — see Part D's Recommendation #1), then I3–I6.
+3. Follow TDD for every logic change (existing suite: `src/models/estimate.test.ts`, `score.test.ts`, `fetch.test.ts`, `src/hardware.test.ts` — 20 tests, all currently green; keep them green and add tests per I6).
+4. Commit in logical groups with `fix:`/`test:`/`refactor:` prefixes, not one giant commit.
+5. Re-run the full verification suite (`npm run compile`, `npm run test:unit`, `npm test`, `npx vsce package`) and update the tables below.
+6. Push to `origin master` (remote is already configured — see Repo State below). **Do not** add any Claude/AI co-author attribution to commits — this project's convention (set by the human) is commits authored solely as the human, no `Co-Authored-By` trailers.
+7. Only after C1+I1–I6 are fixed and verified: do the two human-only tasks in Part D (D4) and optionally Task 11.
+
+Minors (D3) and the process lesson (D6) are optional polish — do not block on them.
+
+### Repo state
+
+- **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
+- **Local branch:** `master`, tracking `origin/master`, currently in sync (verify with `git status` / `git log origin/master..HEAD` before assuming — push again after any new local commits).
+- **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
+- **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
+
+**Tasks 1–10: ✅ COMPLETE.** All implemented, independently reviewed per task, and committed. The extension runs end to end: scan → tiered recommendations → neon webview.
+
+Verified by the controller after Task 10 (state as of commit `367cdf6`; re-run after the Part D fix wave):
 
 | Check | Result |
 |---|---|
@@ -23,9 +44,9 @@ Verified by the controller after Task 10:
 | `npm test` (real Electron host) | 1 passing, both commands registered |
 | `npx vsce package` | `local-model-advisor-0.1.0.vsix`, 10 files, no dev files leaked |
 
-**Task 11: ⏸️ DEFERRED** — needs a GitHub repo, a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it.
+**Task 11: ⏸️ DEFERRED** — needs a GitHub repo (now exists, see Repo State above — so this blocker is partially cleared), a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it. Do not start it before Part D's Critical+Important fixes land.
 
-**⚠️ NOT shippable yet.** A final whole-branch review found **1 Critical + 6 Important + 11 Minor** issues that Tasks 1–10 did not cover — most notably a webview state bug that makes the UI unrecoverable after an ordinary tab switch. See **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** at the end of this document. Fix Critical + Important before any publish.
+**⚠️ NOT shippable yet.** A final whole-branch review found **1 Critical + 6 Important + 11 Minor** issues that Tasks 1–10 did not cover — most notably a webview state bug that makes the UI unrecoverable after an ordinary tab switch. See **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** at the end of this document. **None of these fixes have been applied yet** — this is the actual next work. Fix Critical + Important before any publish.
 
 ### Task completion map
 
@@ -42,6 +63,13 @@ Verified by the controller after Task 10:
 | 9 — Wire end-to-end | ✅ | `e109e0a` |
 | 10 — Marketplace assets & docs | ✅ | `5922818` (+ `367cdf6` exclude CLAUDE.md) |
 | 11 — CI + publish | ⏸️ deferred | — |
+| *(post-review)* Final whole-branch review | ✅ ran, found 18 findings | — (review only, no fix commits yet) |
+| *(post-review)* Fix wave for Part D findings | ❌ not started | — |
+| *(post-review)* docs: status update in this file | ✅ | `fb038a5` |
+| *(post-review)* chore: broaden .gitignore | ✅ | `dc4eee6` |
+| *(post-review)* Push to GitHub remote | ✅ | — (push, not a commit) |
+
+Full commit range so far: `c136d34` (baseline) .. `dc4eee6` (latest), 15 commits, all on `master`, all pushed to `origin`.
 
 Deviations from this plan that were made deliberately during execution, and why:
 
