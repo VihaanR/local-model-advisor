@@ -1,56 +1,38 @@
-# local-model-advisor README
+# Local Model Advisor
 
-This is the README for your extension "local-model-advisor". After writing up a brief description, we recommend including the following sections.
+Find local AI models that **actually fit your machine** — from inside VS Code.
 
-## Features
+One command scans your CPU, RAM and GPU, cross-references the most-downloaded
+GGUF models on Hugging Face, and ranks what your hardware can really run:
 
-This extension will scan your hardware and recommend the best local AI models for your system.
+- **GPU TURBO** — fits entirely in VRAM (fastest)
+- **HYBRID** — partial GPU offload
+- **CPU OK** — fits in system RAM
 
-## Requirements
+Each recommendation ships with a one-click `ollama run hf.co/<model>` command.
 
-No requirements or dependencies.
+![screenshot](media/screenshot.png)
 
-## Extension Settings
+## Usage
 
-## Known Issues
+1. `Ctrl+Shift+P` → **Local Model Advisor: Scan Hardware & Recommend Models**
+2. Filter by tier, open the model's Hugging Face page, or copy its Ollama command.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## Optional: Hugging Face token
 
-## Release Notes
+The advisor works without any account. If you hit API rate limits, add a free
+`read` token from <https://huggingface.co/settings/tokens> via
+**Local Model Advisor: Set Hugging Face Token** — it is stored in your OS
+keychain (VS Code SecretStorage), never in settings or on disk in plain text.
 
-Users appreciate release notes as you update your extension.
+## Privacy
 
-### 1.0.0
+Hardware details never leave your machine. The only network call is a public
+model-listing request to `huggingface.co`; when offline, a bundled catalog is
+used instead.
 
-Initial release of ...
+## How sizes are estimated
 
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Sizes assume Q4 quantization (~0.6 GB per billion parameters) plus context
+headroom. Reported VRAM can be inaccurate on some Windows drivers — treat
+tiers as guidance, not gospel.

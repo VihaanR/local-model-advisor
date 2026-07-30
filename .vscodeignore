@@ -3,10 +3,17 @@
 out/**
 node_modules/**
 src/**
+scripts/**
+.claude/**
+.superpowers/**
+media/icon.svg
 .gitignore
 .yarnrc
 esbuild.js
 vsc-extension-quickstart.md
+code_design.md
+vitest.config.ts
+.vscode-test.mjs
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
