@@ -8,6 +8,51 @@
 
 **Tech Stack:** TypeScript 5.9 (strict), esbuild dual-bundle (node/cjs extension + browser/iife webview), `systeminformation` (hardware), Hugging Face REST API (no SDK), Vitest (unit tests), `@vscode/test-electron` (smoke test), vanilla TS + hand-rolled neon CSS webview (no framework, no CDN), `vsce` (packaging).
 
+---
+
+## BUILD STATUS — updated 2026-07-30
+
+**Tasks 1–10: ✅ COMPLETE.** All implemented, independently reviewed per task, and committed (13 commits, `c136d34`..`367cdf6`, working tree clean). The extension runs end to end: scan → tiered recommendations → neon webview.
+
+Verified by the controller after Task 10:
+
+| Check | Result |
+|---|---|
+| `npm run compile` | clean (tsc + eslint + dual esbuild bundle) |
+| `npm run test:unit` | 4 files, 20 tests, all passing |
+| `npm test` (real Electron host) | 1 passing, both commands registered |
+| `npx vsce package` | `local-model-advisor-0.1.0.vsix`, 10 files, no dev files leaked |
+
+**Task 11: ⏸️ DEFERRED** — needs a GitHub repo, a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it.
+
+**⚠️ NOT shippable yet.** A final whole-branch review found **1 Critical + 6 Important + 11 Minor** issues that Tasks 1–10 did not cover — most notably a webview state bug that makes the UI unrecoverable after an ordinary tab switch. See **[Part D — Outstanding work](#part-d--outstanding-work-post-review)** at the end of this document. Fix Critical + Important before any publish.
+
+### Task completion map
+
+| Task | Status | Commit(s) |
+|---|---|---|
+| 1 — Manifest repair | ✅ | `a00b89b` |
+| 2 — Vitest infra + size estimation | ✅ | `9c66b3a` (+ `aa047a4` skipLibCheck fix) |
+| 3 — Shared types + fit scoring | ✅ | `a9dc191` |
+| 4 — Fetch layer + offline catalog | ✅ | `214f877` |
+| 5 — Hardware scanner | ✅ | `9c72bc3` |
+| 6 — HF token via SecretStorage | ✅ | `cad3032` |
+| 7 — Dual bundle + webview panel | ✅ | `a5112cc` |
+| 8 — Neon UI frontend | ✅ | `6ec7fee` |
+| 9 — Wire end-to-end | ✅ | `e109e0a` |
+| 10 — Marketplace assets & docs | ✅ | `5922818` (+ `367cdf6` exclude CLAUDE.md) |
+| 11 — CI + publish | ⏸️ deferred | — |
+
+Deviations from this plan that were made deliberately during execution, and why:
+
+1. **`skipLibCheck: true` added to `tsconfig.json`** (`aa047a4`) — vitest ships ESM-only `.d.cts` declarations that `tsc` rejects under `module: Node16`, breaking `npm run compile` project-wide. Not anticipated by this plan.
+2. **`src/test/extension.test.ts` calls `extension.activate()`** before `getCommands()` — the plan's literal test could never pass, because a VS Code test host does not eagerly activate the extension, so declared-but-unregistered commands never enter the registry.
+3. **`@vscode/vsce` added as a devDependency** — bare `npx vsce` resolves to the deprecated `vsce@2.15.0`, which hard-fails on this manifest's (intentionally absent) `activationEvents` field.
+4. **`.superpowers/**` and `CLAUDE.md` added to `.vscodeignore`** — both were leaking into the `.vsix`; neither was on this plan's exclude list.
+5. **`media/screenshot.png` was never captured** — requires a GUI. Still open; see Part D.
+
+---
+
 ## Global Constraints
 
 - `engines.vscode` must be `^1.120.0` (matches `@types/vscode ^1.120.0`). The current `^1.000.0` is a typo and must not survive.
@@ -19,7 +64,9 @@
 
 ---
 
-## Part A — What has already been done (audit, 2026-07-30)
+## Part A — Starting-state audit (historical; describes the code BEFORE Tasks 1–10 ran)
+
+> Kept for provenance. Every "Not built" / "broken" item below has since been fixed — see the Build Status table above.
 
 | Area | State |
 |---|---|
@@ -1584,7 +1631,9 @@ git commit -m "docs: marketplace assets, README, changelog, license; v0.1.0"
 
 ---
 
-### Task 11: CI + publish workflow
+### Task 11: CI + publish workflow — ⏸️ DEFERRED (not started)
+
+> Blocked on external setup only: a GitHub repo, a Marketplace publisher ID, and an Azure DevOps PAT. No code change is required to unblock it. Do not run this until Part D's Critical + Important findings are fixed.
 
 **Files:**
 - Create: `.github/workflows/ci.yml`, `.github/workflows/publish.yml`
@@ -1645,9 +1694,65 @@ git commit -m "ci: build/test/package workflow and manual publish workflow"
 
 ## Final verification checklist (run after Task 11)
 
-1. `npm run compile` — clean.
-2. `npm run test:unit` — all vitest suites green (estimate, score, fetch, hardware).
-3. `npm test` — integration smoke test green.
-4. F5 manual pass per Task 9 Step 4, including the offline-fallback path.
-5. `npx vsce package` + local `.vsix` install — panel works from the packaged build (catches `.vscodeignore` mistakes that F5 hides).
-6. `git log --oneline` — one commit per task, working tree clean.
+1. `npm run compile` — clean. ✅ passing
+2. `npm run test:unit` — all vitest suites green (estimate, score, fetch, hardware). ✅ 20/20
+3. `npm test` — integration smoke test green. ✅ passing
+4. F5 manual pass per Task 9 Step 4, including the offline-fallback path. ❌ **not done — human only**
+5. `npx vsce package` + local `.vsix` install — panel works from the packaged build. ⚠️ package ✅; local install not done (`code` CLI not on PATH)
+6. `git log --oneline` — one commit per task, working tree clean. ✅ 13 commits, clean
+
+---
+
+# Part D — Outstanding work (post-review)
+
+A final whole-branch review (base `c136d34` → head `367cdf6`) surfaced defects that the per-task reviews structurally could not see, because each of those only judged one task's diff against its own brief. Notably, the two most serious findings are **absences in this plan** rather than mistakes in the implementation — this plan never specified webview lifecycle behavior at all.
+
+**Count: 18 code findings (1 Critical, 6 Important, 11 Minor) + 2 human-only tasks + Task 11.**
+
+Ship gate: fix **Critical + Important (7 items)** before publishing. Minors are optional polish.
+
+## D1 — Critical (1) — blocks release
+
+**C1. Webview strands on a fake "Scanning hardware" radar after a tab switch.**
+`src/panel.ts` omits `retainContextWhenHidden`, so VS Code destroys the webview DOM when hidden and reloads the HTML when shown again. On reload `src/webview/main.ts` runs `renderLoading()` from fresh module state and nothing ever re-posts — there is no `onDidChangeViewState` listener, no ready handshake, and no `setState`/`getState`. `renderLoading()` also renders **no Rescan button** (unlike `renderError()`), so the only escape is closing the tab. Triggered by clicking any other editor tab and clicking back — users will hit this on first use.
+
+Fix: cache the last `ExtensionToWebview` in `AdvisorPanel` and re-post it on `onDidChangeViewState` when visible; add `retainContextWhenHidden: true`; give the loading state a Rescan button as a backstop.
+
+## D2 — Important (6) — fix before release
+
+| # | Issue | Where |
+|---|---|---|
+| I1 | `post()` throws if the panel was disposed mid-scan (VS Code's `webview` getter calls `assertNotDisposed()`). Closing the panel during the ≤10s fetch throws, the catch tries to post an error, throws again, and escapes as an unhandled rejection. `AdvisorPanel.current = undefined` does not help — the in-flight closure holds the instance. | `src/panel.ts`, `src/extension.ts` |
+| I2 | No in-flight guard in `runScan` — running the command twice or spamming Rescan starts N concurrent scans; a slow earlier scan can overwrite a newer result. Needs a generation counter and a disabled Rescan while scanning. | `src/extension.ts`, `src/webview/main.ts` |
+| I3 | **`CPU_OVERHEAD_GB` duplicated and the two memory models disagree.** `minRamGB = ceil(size + 2)` is what the UI shows as "needs 7 GB", but the tier gate is `size + 2 <= ram * 0.75` (~9.1 GB for the same 8B model) — the user-facing number understates the real requirement by a third. The constant is baked in a third time in `catalog.json`. | `src/models/fetch.ts`, `score.ts`, `catalog.json` |
+| I4 | Every failure collapses into "Offline mode — Hugging Face unreachable". A 401 from a stale token, a 429 rate limit, and a real outage are indistinguishable — and the token case actively lies to a user who configured something. Also swallows genuine `scoreModels` bugs. | `src/models/fetch.ts`, `src/webview/main.ts` |
+| I5 | **The live catalog recommends models Ollama can't run as advertised.** Verified against the real endpoint: survivors include speech-recognition (`nemotron-…-asr-streaming`, `parakeet-…`) and image generation (`Flux2-Klein-9B`), each handed an "⧉ ollama run" button. Same sample has heavy near-duplicate spam (4+ repackagings of one model competing for the 12 slots). Needs `pipeline_tag=text-generation` and de-duplication on a normalized base name. | `src/models/fetch.ts` |
+| I6 | Test coverage stops where the risk starts: no test pins the now-dominant `NN-B-ANB` MoE naming (`Qwen3-Coder-30B-A3B` must parse as **30**, not 3 — currently correct only by first-match accident); no test that `Authorization` is absent without a token; no `classifyFit` boundary tests; the webview reducer (where C1 lived) is entirely untested. | `src/models/*.test.ts`, `src/webview/main.ts` |
+
+## D3 — Minor (11) — optional polish
+
+1. `openExternal`/`copy` trust arbitrary webview strings — add an `https:` + `huggingface.co` allowlist (`src/extension.ts`).
+2. Nonce uses `Math.random()`; `crypto.randomUUID()` is free (`src/panel.ts`).
+3. MoE size math overestimates (`8x7B → 56B → 33.6 GB`; Mixtral is ~47B/~26 GB — experts share attention/embeddings). Fine as conservative, worth a comment.
+4. Apple branch can render a contradiction: `gpuModel: null` + `vramGB: 23.4` → "None detected · 23.4 GB VRAM" while `classifyFit` hands out `gpu` tiers (`src/hardware.ts`).
+5. Empty live result reports `source: 'live'` with zero models, blaming the user's hardware for an upstream problem (`src/models/fetch.ts`).
+6. `catalog as ModelRecommendation[]` is an unchecked assertion — a field missing from every row still compiles.
+7. `logLevel: 'silent'` hides esbuild warnings, and nothing executes the bundle in tests (`esbuild.js`).
+8. `extension?.activate()` silently no-ops on a wrong extension id — `assert.ok(extension)` first (`src/test/extension.test.ts`).
+9. Dead CSS `.model-meta b` — no `<b>` is ever emitted (`src/webview/styles.css`).
+10. One tsconfig with `lib: ["ES2022","DOM"]` lets extension-host code reference `document` with no type error; a second tsconfig for `src/webview` would enforce the boundary the neon skill only conventions.
+11. Accessibility: filter chips lack `aria-pressed`; the copy button's only label is `⧉ ollama run`.
+
+## D4 — Human-only tasks (2)
+
+1. **Capture `media/screenshot.png`** — F5 → run the scan command → screenshot the panel. `README.md:14` references it, so the link is broken until then. **Note:** capturing it locally is not sufficient — vsce rewrites relative README image paths against `repository`, so the Marketplace page will fetch `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png`. The repo must exist and the PNG must be committed and pushed, or the listing stays broken.
+2. **Local `.vsix` install sanity pass** — `code --install-extension local-model-advisor-0.1.0.vsix`, then run the command once. (`code` was not on PATH in the build environment.)
+
+## D5 — Task 11 tripwires
+
+- `repository.url` points at a repo that doesn't exist yet — Marketplace sidebar links 404 until it's created. Consider adding `bugs` and `homepage` at the same time.
+- `sharp` is a devDependency for one 7-line script whose output (`media/icon.png`) is already committed. It's a large platform-binary install that will slow and occasionally break `npm ci` in CI — consider dropping it and documenting the one-off command.
+
+## D6 — Process lesson
+
+Two of the three most serious findings were **absences in this plan**, not implementation errors. Per-task TDD review cannot catch "the plan never asked for X." Recommendation: add a lifecycle checklist to `.claude/skills/neon-webview-ui` — dispose safety, hidden/shown reload, state replay, concurrent invocation — so the next UI task inherits it. Also worth creating `src/models/constants.ts` as the single source for `CPU_OVERHEAD_GB`, `CTX_HEADROOM_GB`, `OS_RESERVE_FRACTION`, and `Q4_GB_PER_B`, which the UI footnote and README currently restate independently.
