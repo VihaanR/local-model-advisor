@@ -14,7 +14,7 @@
 
 ### 🔴 RESUME HERE (next session)
 
-**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, and committed locally as `ccb4613` — but NOT YET PUSHED to `origin`.** The single next action is either (a) push `ccb4613` to `origin master`, or (b) do the two human-only tasks (D4) first and push both together. Nothing else in Part D blocks release.
+**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, committed (`ccb4613`), and PUSHED to `origin/master`** (along with doc update `62367ec`). The only remaining gates before publishing are D4 (2 human-only tasks: screenshot + local `.vsix` install check) and Task 11 (CI + Marketplace publish). Nothing else in Part D blocks release.
 
 What happened: a fix-wave implementer subagent was dispatched with a fully-specified brief (`.superpowers/sdd/fix-wave-1-brief.md`, still on disk, gitignored) covering all 7 items with exact code. It implemented all 7, flagged one deviation (the brief's own `MOE_ACTIVE_PATTERN` regex for I6 didn't satisfy the brief's own second test case for reversed MoE active/total ordering — verified independently by the controller with a scratch script before accepting), and committed as `ccb4613`. An independent task-reviewer subagent then re-ran `npm run check-types`/`lint`/`test:unit`/`compile` itself (not trusting the implementer's report), verified all 7 items against the brief item-by-item, confirmed the commit has no AI/Claude attribution, and confirmed zero scope creep. Verdict: **approved, task complete.**
 
@@ -30,7 +30,7 @@ Minors (D3) and the process lesson (D6) are still optional polish — do not blo
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
-- **Local branch:** `master`, tracking `origin/master`, currently **1 commit ahead** (`ccb4613`, fix wave 1 — not yet pushed). Verify with `git log origin/master..HEAD` before assuming otherwise.
+- **Local branch:** `master`, tracking `origin/master`, in sync as of `62367ec` (fix wave 1 `ccb4613` + doc update `62367ec` both pushed). Verify with `git log origin/master..HEAD` before assuming otherwise.
 - **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
 - **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
 
