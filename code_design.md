@@ -10,29 +10,28 @@
 
 ---
 
-## BUILD STATUS — updated 2026-07-30 (Task 12 landed)
+## BUILD STATUS — updated 2026-07-31 (fix wave 2: all remaining code work landed)
 
 ### 🔴 RESUME HERE (next session)
 
-**Everything shipped so far is DONE and independently reviewed. One commit is local-only, not yet pushed: `dd87c02` (Task 12).**
+**All code-side work in this plan is now COMPLETE. Everything that remains is human-only or needs external accounts.**
 
-- **Fix wave 1** (C1 + I1–I6, all 7 ship-blocking findings from Part D's final review): DONE, reviewed, committed `ccb4613`, pushed.
-- **Task 12** (GPT4All as a second live catalog source, at the user's request to broaden the model pool beyond Hugging Face alone): DONE, reviewed, committed `dd87c02`, **not yet pushed**. `getRecommendations` now fetches Hugging Face and GPT4All in parallel (`Promise.allSettled`), merges + de-dupes, only falls back to `catalog.json` if both fail. Zero changes outside `src/models/*` + one skill doc — `extension.ts`/`panel.ts`/webview untouched.
-
-Both used the same process: a fully-specified brief with exact code dispatched to an implementer subagent, then an independent reviewer subagent that re-ran `check-types`/`lint`/`test:unit`/`compile` itself (never trusting the implementer's report) and checked every requirement line-by-line. Both came back approved with zero required fix rounds. Test suite is now 7 files / 47 tests, all green.
+Fix wave 2 (this session) closed every outstanding *implementable* item: all 11 D3 minors, both D5 tripwires, Task 11's workflows, and D6's skill checklist. Test suite grew from 7 files / 47 tests to **9 files / 74 tests**, all green.
 
 To resume:
 
-1. `git log --oneline origin/master..HEAD` — should show only `dd87c02` and its doc-update commit as unpushed. If so, decide: push now, or bundle with D4's two human-only tasks first.
-2. `git push origin master`.
-3. Remaining gates before Marketplace publish: **D4** (2 human-only tasks — screenshot capture, local `.vsix` install sanity check) and **Task 11** (CI + publish workflow, needs a Marketplace publisher ID + Azure DevOps PAT). Neither depends on Task 12.
+1. `git push origin master` — 4 commits are unpushed (`bd9ccb7`, `dd87c02`, `438d631` from Task 12, plus fix wave 2).
+2. **D4 — the only work left that this environment cannot do** (both need a GUI; `code` is still not on PATH here):
+   - Capture `media/screenshot.png` (F5 → run the scan command → screenshot the panel). `README.md:14` links it, and vsce rewrites that path to `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png` — so it must be committed **and pushed** or the Marketplace listing shows a broken image.
+   - `code --install-extension local-model-advisor-0.1.0.vsix`, then run the command once from the installed build.
+3. **Task 11 Step 3 — external accounts only**: create the Marketplace publisher (ID must match `publisher: "vihaan-raut"` in `package.json`) and an Azure DevOps PAT. Then either `npx vsce login vihaan-raut && npx vsce publish`, or add the PAT as the `VSCE_PAT` repo secret and run the Publish workflow. The workflows themselves are written and committed.
 
-Minors (D3) and the process lesson (D6) are still optional polish — do not block on them. D6's `constants.ts` recommendation was already implemented in fix wave 1.
+Nothing in Part D is outstanding any more except D4.
 
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
-- **Local branch:** `master`, tracking `origin/master`, **1-2 commits ahead** (`dd87c02` Task 12 + its doc-update commit) — not yet pushed as of this update. Verify with `git log origin/master..HEAD` before assuming otherwise.
+- **Local branch:** `master`, tracking `origin/master`, **4 commits ahead** (`bd9ccb7`, `dd87c02`, `438d631` from Task 12, plus fix wave 2) — not yet pushed as of this update. Verify with `git log origin/master..HEAD` before assuming otherwise.
 - **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
 - **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
 
@@ -58,9 +57,20 @@ Re-verified independently by the task reviewer after fix wave 1 (state as of com
 | `npm test` (real Electron host) | passing (trusted from implementer report — reviewer skipped re-running it deliberately, it launches a real VS Code download and is slow/flaky in a sandbox; `src/test/extension.test.ts` is untouched in the diff) |
 | `npx vsce package` | not re-run since `367cdf6` — do this again before any publish, since `catalog.json` and other bundled files changed |
 
-**Task 11: ⏸️ DEFERRED** — needs a GitHub repo (now exists, see Repo State above — so this blocker is partially cleared), a Marketplace publisher ID, and an Azure DevOps PAT that don't exist yet. Nothing in code blocks it.
+**Task 11: ✅ WORKFLOWS COMMITTED / ⏸️ publish still gated externally** — `.github/workflows/ci.yml` and `publish.yml` exist and are committed (Steps 1, 2, 4 done). Only Step 3 remains: a Marketplace publisher ID and an Azure DevOps PAT, which are account-creation tasks, not code.
 
-**Ship-blocking code work is now DONE.** Fix wave 1 closed all 7 Critical+Important findings from the final whole-branch review (webview lifecycle, disposal safety, concurrency guard, constants unification, error classification, catalog query quality, test coverage). See **[Part D](#part-d--outstanding-work-post-review)** for the full original finding list (kept for record) — D1/D2 are now resolved, D3 (11 Minors) and D6 (process lesson) remain optional, D4 (2 human-only tasks) and Task 11 remain the only real gates before publishing.
+**All code work in this plan is now DONE.** Fix wave 1 closed the 7 Critical+Important findings (webview lifecycle, disposal safety, concurrency guard, constants unification, error classification, catalog query quality, test coverage). Fix wave 2 closed everything else implementable: all 11 D3 minors, both D5 tripwires, Task 11's workflows, and D6's skill checklist. See **[Part D](#part-d--outstanding-work-post-review)** — D1, D2, D3, D5 and D6 are all resolved; **D4 (2 human-only tasks) is the only outstanding item**, alongside Task 11 Step 3's external accounts.
+
+Verified after fix wave 2 (all re-run in this session, not trusted from any report):
+
+| Check | Result |
+|---|---|
+| `npm run check-types` | clean — **now type-checks two projects** (host + webview) |
+| `npm run lint` | clean |
+| `npm run test:unit` | **9 files, 74 tests, all passing** (was 7/47) |
+| `npm run compile` | clean (full pipeline, no esbuild warnings) |
+| `npm test` (real Electron host) | 1 passing — re-run for real after hardening the assertion |
+| `npx vsce package` | `local-model-advisor-0.1.0.vsix`, 10 files, 124.85 KB, no dev files leaked |
 
 ### Task completion map
 
@@ -76,7 +86,7 @@ Re-verified independently by the task reviewer after fix wave 1 (state as of com
 | 8 — Neon UI frontend | ✅ | `6ec7fee` |
 | 9 — Wire end-to-end | ✅ | `e109e0a` |
 | 10 — Marketplace assets & docs | ✅ | `5922818` (+ `367cdf6` exclude CLAUDE.md) |
-| 11 — CI + publish | ⏸️ deferred | — |
+| 11 — CI + publish | ✅ workflows done (Steps 1/2/4); Step 3 needs external accounts | fix wave 2 |
 | *(post-review)* Final whole-branch review | ✅ ran, found 18 findings | — (review only, no fix commits yet) |
 | *(post-review)* docs: status update in this file | ✅ | `fb038a5` |
 | *(post-review)* chore: broaden .gitignore | ✅ | `dc4eee6` |
@@ -86,6 +96,7 @@ Re-verified independently by the task reviewer after fix wave 1 (state as of com
 | *(post-review)* docs: fix wave 1 status updates | ✅ | `62367ec`, `14b3677` |
 | *(post-review)* docs: Task 12 plan added | ✅ | `bd9ccb7` |
 | **12 — GPT4All second live source** | ✅ implemented + independently reviewed, approved | `dd87c02` |
+| *(post-review)* **Fix wave 2: all 11 D3 minors + D5 + D6 + Task 11 workflows** | ✅ implemented, full pipeline re-verified | fix wave 2 |
 
 Full commit range so far: `c136d34` (baseline) .. `dd87c02` (latest), 21 commits, all on `master`. **20 of 21 pushed to `origin`; `dd87c02` is local-only, waiting on a push decision.**
 
@@ -1677,14 +1688,21 @@ git commit -m "docs: marketplace assets, README, changelog, license; v0.1.0"
 
 ---
 
-### Task 11: CI + publish workflow — ⏸️ DEFERRED (not started)
+### Task 11: CI + publish workflow — ✅ WORKFLOWS DONE / ⏸️ Step 3 needs external accounts
 
-> Blocked on external setup only: a GitHub repo, a Marketplace publisher ID, and an Azure DevOps PAT. No code change is required to unblock it. Do not run this until Part D's Critical + Important findings are fixed.
+> Steps 1, 2 and 4 landed in fix wave 2. Both workflow files exist and are committed. Only Step 3 (create the Marketplace publisher + Azure DevOps PAT) remains, and it is account creation, not code.
+>
+> **Deviations from the YAML below, made deliberately:**
+>
+> 1. `publish.yml` passes the PAT as the `VSCE_PAT` **env var** rather than `-p ${{ secrets.VSCE_PAT }}` on the command line — vsce reads it natively, and argv can surface in process listings and error output.
+> 2. `publish.yml` runs `lint` / `check-types` / `test:unit` before publishing. The version below publishes an entirely unverified build.
+> 3. Both workflows declare `permissions: contents: read` and use expanded (non-flow) YAML.
+> 4. `.github/**` was added to `.vscodeignore` so the workflows do not ship inside the `.vsix`.
 
 **Files:**
 - Create: `.github/workflows/ci.yml`, `.github/workflows/publish.yml`
 
-- [ ] **Step 1: Create `.github/workflows/ci.yml`**
+- [x] **Step 1: Create `.github/workflows/ci.yml`**
 
 ```yaml
 name: CI
@@ -1707,7 +1725,7 @@ jobs:
         with: { name: vsix, path: '*.vsix' }
 ```
 
-- [ ] **Step 2: Create `.github/workflows/publish.yml`** (manual trigger; reads the `VSCE_PAT` repo secret — see Part B)
+- [x] **Step 2: Create `.github/workflows/publish.yml`** (manual trigger; reads the `VSCE_PAT` repo secret — see Part B)
 
 ```yaml
 name: Publish
@@ -1723,13 +1741,13 @@ jobs:
       - run: npx vsce publish -p ${{ secrets.VSCE_PAT }}
 ```
 
-- [ ] **Step 3: First-publish runbook (manual, one-time — also in `.claude/skills/marketplace-release`)**
+- [ ] **Step 3: First-publish runbook (manual, one-time — also in `.claude/skills/marketplace-release`)** ⬅️ **THE ONLY REMAINING STEP**
 
-1. Create the GitHub repo `VihaanR/local-model-advisor` and push (`git remote add origin … && git push -u origin master`).
+1. ✅ Already done — the GitHub repo `VihaanR/local-model-advisor` exists and `master` is pushed.
 2. Create a publisher at https://marketplace.visualstudio.com/manage — the ID you choose **must match `publisher` in `package.json`** (plan default: `vihaan-raut`).
 3. Create the Azure DevOps PAT (Part B) and either `npx vsce login vihaan-raut` + `npx vsce publish` locally, or add it as the `VSCE_PAT` GitHub secret and run the Publish workflow.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** — landed in fix wave 2.
 
 ```bash
 git add .github
@@ -2083,14 +2101,14 @@ git commit -m "feat: add GPT4All as a second live catalog source, merged and de-
 
 ---
 
-## Final verification checklist (run after Task 11)
+## Final verification checklist (state after fix wave 2, 2026-07-31)
 
-1. `npm run compile` — clean. ✅ passing
-2. `npm run test:unit` — all vitest suites green (estimate, score, fetch, hardware). ✅ 20/20
-3. `npm test` — integration smoke test green. ✅ passing
-4. F5 manual pass per Task 9 Step 4, including the offline-fallback path. ❌ **not done — human only**
-5. `npx vsce package` + local `.vsix` install — panel works from the packaged build. ⚠️ package ✅; local install not done (`code` CLI not on PATH)
-6. `git log --oneline` — one commit per task, working tree clean. ✅ 13 commits, clean
+1. `npm run compile` — clean (both tsconfig projects + lint + dual bundle, no esbuild warnings). ✅ passing
+2. `npm run test:unit` — all vitest suites green (estimate, score, fetch, dedupe, gpt4all, hardware, validate, state, bundle). ✅ **74/74 across 9 files**
+3. `npm test` — integration smoke test green against the real Electron host. ✅ 1 passing
+4. F5 manual pass per Task 9 Step 4, including the offline-fallback path. ❌ **not done — human only (D4)**
+5. `npx vsce package` + local `.vsix` install — panel works from the packaged build. ⚠️ package ✅ (10 files, 124.85 KB, nothing leaked); local install still not done — `code` CLI is not on PATH in this environment (D4)
+6. `git log --oneline` — one commit per task, working tree clean. ✅ clean, 4 commits awaiting push
 
 ---
 
@@ -2102,7 +2120,7 @@ A final whole-branch review (base `c136d34` → head `367cdf6`) surfaced defects
 
 Ship gate: fix **Critical + Important (7 items)** before publishing. Minors are optional polish.
 
-**STATUS: D1 + D2 (all 7 ship-blocking items) fixed in fix wave 1, commit `ccb4613`, independently reviewed and approved. Kept below for historical record of what was wrong and why — not a to-do list anymore.**
+**STATUS: fully closed except D4.** D1 + D2 (all 7 ship-blocking items) fixed in fix wave 1 (`ccb4613`), independently reviewed and approved. D3 (all 11 minors), D5 (both tripwires) and D6 fixed in fix wave 2. **D4's 2 human-only tasks are the only outstanding items in Part D.** Everything below is kept as a historical record of what was wrong and why — it is not a to-do list any more.
 
 ## D1 — Critical (1) — ✅ FIXED in `ccb4613`
 
@@ -2122,30 +2140,37 @@ Fix: cache the last `ExtensionToWebview` in `AdvisorPanel` and re-post it on `on
 | I5 | **The live catalog recommends models Ollama can't run as advertised.** Verified against the real endpoint: survivors include speech-recognition (`nemotron-…-asr-streaming`, `parakeet-…`) and image generation (`Flux2-Klein-9B`), each handed an "⧉ ollama run" button. Same sample has heavy near-duplicate spam (4+ repackagings of one model competing for the 12 slots). Needs `pipeline_tag=text-generation` and de-duplication on a normalized base name. | `src/models/fetch.ts` |
 | I6 | Test coverage stops where the risk starts: no test pins the now-dominant `NN-B-ANB` MoE naming (`Qwen3-Coder-30B-A3B` must parse as **30**, not 3 — currently correct only by first-match accident); no test that `Authorization` is absent without a token; no `classifyFit` boundary tests; the webview reducer (where C1 lived) is entirely untested. | `src/models/*.test.ts`, `src/webview/main.ts` |
 
-## D3 — Minor (11) — optional polish
+## D3 — Minor (11) — ✅ ALL FIXED in fix wave 2
 
-1. `openExternal`/`copy` trust arbitrary webview strings — add an `https:` + `huggingface.co` allowlist (`src/extension.ts`).
-2. Nonce uses `Math.random()`; `crypto.randomUUID()` is free (`src/panel.ts`).
-3. MoE size math overestimates (`8x7B → 56B → 33.6 GB`; Mixtral is ~47B/~26 GB — experts share attention/embeddings). Fine as conservative, worth a comment.
-4. Apple branch can render a contradiction: `gpuModel: null` + `vramGB: 23.4` → "None detected · 23.4 GB VRAM" while `classifyFit` hands out `gpu` tiers (`src/hardware.ts`).
-5. Empty live result reports `source: 'live'` with zero models, blaming the user's hardware for an upstream problem (`src/models/fetch.ts`).
-6. `catalog as ModelRecommendation[]` is an unchecked assertion — a field missing from every row still compiles.
-7. `logLevel: 'silent'` hides esbuild warnings, and nothing executes the bundle in tests (`esbuild.js`).
-8. `extension?.activate()` silently no-ops on a wrong extension id — `assert.ok(extension)` first (`src/test/extension.test.ts`).
-9. Dead CSS `.model-meta b` — no `<b>` is ever emitted (`src/webview/styles.css`).
-10. One tsconfig with `lib: ["ES2022","DOM"]` lets extension-host code reference `document` with no type error; a second tsconfig for `src/webview` would enforce the boundary the neon skill only conventions.
-11. Accessibility: filter chips lack `aria-pressed`; the copy button's only label is `⧉ ollama run`.
+| # | Issue | How it was fixed |
+|---|---|---|
+| 1 | `openExternal`/`copy` trust arbitrary webview strings — need an `https:` + `huggingface.co` allowlist (`src/extension.ts`). | New pure module `src/validate.ts` (+ 12 tests in `validate.test.ts`): `isAllowedExternalUrl` requires `https:` **and** an exact `huggingface.co` hostname (rejects `huggingface.co.evil.example` and `evilhuggingface.co`); `isAllowedCopyText` accepts only `^ollama run hf\.co/<owner>/<repo>$`, blocking appended `&&`/`;`/newline commands. Rejections surface a warning toast instead of failing silently. |
+| 2 | Nonce uses `Math.random()`; `crypto.randomUUID()` is free (`src/panel.ts`). | `randomUUID()` from `node:crypto`, dashes stripped → 32 hex chars, valid per the CSP `base64-value` grammar. |
+| 3 | MoE size math overestimates (`8x7B → 56B → 33.6 GB`; Mixtral is ~47B/~26 GB). Fine as conservative, worth a comment. | Comment added at the MoE branch in `estimate.ts` explaining the direction of the error and why conservative is the safe side (over-reporting only demotes a tier; under-reporting recommends a model the machine can't run). |
+| 4 | Apple branch can render a contradiction: `gpuModel: null` + `vramGB: 23.4` → "None detected · 23.4 GB VRAM". | `deriveHardware` now names the integrated GPU from the CPU model when Apple unified memory applies and no controller was reported. Two new tests pin it, including the non-Apple no-controller case that must still report `null` / `0`. |
+| 5 | Empty live result reports `source: 'live'` with zero models, blaming the user's hardware for an upstream problem. | New `'empty'` `FetchFailureReason`: when **both** sources answer successfully but yield nothing, `getRecommendations` returns `source: 'fallback'` with `reason: 'empty'` and the banner reads "Model index returned no usable entries" instead of falsely claiming the network was unreachable. A transport failure still reports its real reason. |
+| 6 | `catalog as ModelRecommendation[]` is an unchecked assertion — a field missing from every row still compiles. | `isModelRecommendation()` runtime guard (exported + tested); `loadFallbackCatalog()` filters through it. A test asserts no bundled row is dropped, so a bad hand-edit to `catalog.json` fails the suite instead of shipping `NaN`. |
+| 7 | `logLevel: 'silent'` hides esbuild warnings, and nothing executes the bundle in tests. | The problem-matcher plugin now prints `result.warnings` too. New `src/webview/bundle.test.ts` builds `main.ts` with esbuild and **executes the real IIFE** against a DOM stub — asserting zero warnings, successful init, rendered hardware/model rows, banner text, and the a11y attributes. |
+| 8 | `extension?.activate()` silently no-ops on a wrong extension id. | `assert.ok(extension, …)` before `extension.activate()`; re-run against the real Electron host, still 1 passing. |
+| 9 | Dead CSS `.model-meta b` — no `<b>` is ever emitted. | Rule deleted. |
+| 10 | One tsconfig with `lib: ["ES2022","DOM"]` lets extension-host code reference `document` with no type error. | Root `tsconfig.json` drops `DOM` and excludes `src/webview`; new `tsconfig.webview.json` is the only project with `DOM`. `check-types` and `watch` run both. Verified by probe: `document.title` in a host file now fails with TS2584. |
+| 11 | Filter chips lack `aria-pressed`; the copy button's only label is `⧉ ollama run`. | Chips carry `aria-pressed`, the wrapper has `role="group"` + `aria-label`; each copy button gets a distinguishing `aria-label` naming its model. Pinned by `bundle.test.ts`. |
 
 ## D4 — Human-only tasks (2)
 
 1. **Capture `media/screenshot.png`** — F5 → run the scan command → screenshot the panel. `README.md:14` references it, so the link is broken until then. **Note:** capturing it locally is not sufficient — vsce rewrites relative README image paths against `repository`, so the Marketplace page will fetch `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png`. The repo must exist and the PNG must be committed and pushed, or the listing stays broken.
 2. **Local `.vsix` install sanity pass** — `code --install-extension local-model-advisor-0.1.0.vsix`, then run the command once. (`code` was not on PATH in the build environment.)
 
-## D5 — Task 11 tripwires
+## D5 — Task 11 tripwires — ✅ BOTH ADDRESSED in fix wave 2
 
-- `repository.url` points at a repo that doesn't exist yet — Marketplace sidebar links 404 until it's created. Consider adding `bugs` and `homepage` at the same time.
-- `sharp` is a devDependency for one 7-line script whose output (`media/icon.png`) is already committed. It's a large platform-binary install that will slow and occasionally break `npm ci` in CI — consider dropping it and documenting the one-off command.
+- ~~`repository.url` points at a repo that doesn't exist yet~~ — the repo now exists and is pushed. `homepage` and `bugs.url` were added to `package.json` alongside it, so the Marketplace sidebar links resolve.
+- ~~`sharp` is a devDependency for one 7-line script~~ — **dropped from `devDependencies`** (removed 578 lines of platform binaries from `package-lock.json`, so `npm ci` in CI is faster and can no longer break on a `sharp` binary). `media/icon.png` stays committed; `scripts/render-icon.mjs` and the marketplace-release skill now both document the one-off `npm i --no-save sharp && node scripts/render-icon.mjs`.
 
-## D6 — Process lesson
+## D6 — Process lesson — ✅ ACTED ON
 
-Two of the three most serious findings were **absences in this plan**, not implementation errors. Per-task TDD review cannot catch "the plan never asked for X." Recommendation: add a lifecycle checklist to `.claude/skills/neon-webview-ui` — dispose safety, hidden/shown reload, state replay, concurrent invocation — so the next UI task inherits it. Also worth creating `src/models/constants.ts` as the single source for `CPU_OVERHEAD_GB`, `CTX_HEADROOM_GB`, `OS_RESERVE_FRACTION`, and `Q4_GB_PER_B`, which the UI footnote and README currently restate independently.
+Two of the three most serious findings were **absences in this plan**, not implementation errors. Per-task TDD review cannot catch "the plan never asked for X."
+
+Both recommendations are now implemented:
+
+- **Lifecycle checklist** added to `.claude/skills/neon-webview-ui` (fix wave 2) — 8 items covering hidden→shown reload, state replay, dispose safety, concurrent invocation, escape hatches from non-terminal states, reducer purity, building/executing the bundle in tests, and accessibility. Any future UI task inherits it via the skill.
+- **`src/models/constants.ts`** as the single source for `CPU_OVERHEAD_GB`, `CTX_HEADROOM_GB`, `OS_RESERVE_FRACTION`, `Q4_GB_PER_B` (+ `TIMEOUT_MS`, added in Task 12) — implemented back in fix wave 1.
