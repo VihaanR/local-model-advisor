@@ -3,6 +3,7 @@ import { scanHardware } from './hardware';
 import { getRecommendations } from './models/fetch';
 import { AdvisorPanel } from './panel';
 import { getHfToken, promptAndStoreHfToken } from './secrets';
+import { isAllowedCopyText, isAllowedExternalUrl } from './validate';
 import type { WebviewToExtension } from './models/types';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -26,9 +27,17 @@ function handleWebviewMessage(context: vscode.ExtensionContext, message: Webview
 			}
 			break;
 		case 'openExternal':
+			if (!isAllowedExternalUrl(message.url)) {
+				void vscode.window.showWarningMessage('Local Model Advisor: refused to open an unexpected link.');
+				return;
+			}
 			void vscode.env.openExternal(vscode.Uri.parse(message.url));
 			break;
 		case 'copy':
+			if (!isAllowedCopyText(message.text)) {
+				void vscode.window.showWarningMessage('Local Model Advisor: refused to copy an unexpected command.');
+				return;
+			}
 			void vscode.env.clipboard.writeText(message.text).then(() =>
 				vscode.window.showInformationMessage('Command copied — paste it in your terminal.')
 			);

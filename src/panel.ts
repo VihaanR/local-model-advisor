@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { ExtensionToWebview, WebviewToExtension } from './models/types';
 
@@ -83,7 +84,7 @@ export class AdvisorPanel {
 	}
 }
 
+/** 32 hex chars from a CSPRNG. Dashes are stripped so the value is plain `base64-value` per the CSP grammar. */
 function getNonce(): string {
-	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+	return randomUUID().replace(/-/g, '');
 }

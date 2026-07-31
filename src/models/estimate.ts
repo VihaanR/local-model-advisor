@@ -11,6 +11,10 @@ const SINGLE_PATTERN = /(\d+(?:\.\d+)?)\s*b\b/i;
 /** Billions of parameters parsed from a model id, or null if the name carries no size. */
 export function parseParamCount(modelId: string): number | null {
 	// MoE first: "8x7B" would otherwise be read as 7B by the single pattern.
+	// Multiplying out deliberately overestimates — experts share attention and embedding
+	// weights, so Mixtral-8x7B is ~47B (~26 GB at Q4), not the 56B (~33.6 GB) reported here.
+	// Kept conservative on purpose: over-reporting size can only demote a model to a safer
+	// tier, whereas under-reporting would recommend a model the machine cannot actually run.
 	const moe = modelId.match(MOE_PATTERN);
 	if (moe) {
 		return parseInt(moe[1], 10) * parseFloat(moe[2]);

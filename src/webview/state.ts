@@ -43,6 +43,8 @@ export function fallbackBannerText(reason?: FetchFailureReason): string {
 			return 'Hugging Face rate limit hit — showing bundled catalog.';
 		case 'server':
 			return 'Hugging Face is having issues right now — showing bundled catalog.';
+		case 'empty':
+			return 'Model index returned no usable entries — showing bundled catalog.';
 		case 'network':
 		case 'unknown':
 		default:

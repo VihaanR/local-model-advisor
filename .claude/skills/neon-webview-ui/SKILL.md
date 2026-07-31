@@ -38,8 +38,23 @@ The Local Model Advisor webview has a deliberate **neon terminal / CRT** aesthet
 4. Webview code (`src/webview/`) must not import `vscode` — it talks to the host only via the typed messages in `src/models/types.ts` (`ExtensionToWebview` / `WebviewToExtension`). New UI actions = extend those unions first.
 5. Assets ship from `dist/` only (`localResourceRoots`). New files must be added to the webview entry points in `esbuild.js`.
 
+## Lifecycle checklist (verify EVERY item before calling webview work done)
+
+A whole-branch review found that the two most serious defects in this UI were things the plan never asked for, not things it got wrong — a design doc describes what to render, and silently omits how the panel behaves over time. Per-task review cannot catch "nobody specified this." Walk this list explicitly instead.
+
+1. **Hidden → shown.** Click another editor tab and back. VS Code destroys and reloads the webview DOM unless `retainContextWhenHidden: true`, and the frontend restarts from `initialState`. Either retain context or replay state on `onDidChangeViewState` — this panel does both (`AdvisorPanel.lastMessage`).
+2. **State replay.** The host caches the last `ExtensionToWebview` and re-posts it when the panel becomes visible. Any new message type must be safe to receive twice, out of the blue, with no fresh scan behind it.
+3. **Dispose safety.** `panel.webview` throws once disposed. Every post path goes through `AdvisorPanel.post()`, which short-circuits on `this.disposed`. Close the panel mid-scan and confirm no unhandled rejection — the `catch` handler posts too, so an unguarded throw there escapes twice.
+4. **Concurrent invocation.** Re-running the command or spamming Rescan must not interleave results. Scans take a generation from `beginScan()`; a result is dropped unless `isCurrentScan(generation)` still holds. Disable the triggering control while `scanning` is true.
+5. **Every non-terminal state needs an escape hatch.** A loading state with no Rescan button strands the user if the message that would clear it never arrives. Loading and error states both render one.
+6. **Reducer stays pure and tested.** View state transitions live in `src/webview/state.ts` (`reduce`) so `state.test.ts` can cover them without a DOM. Rendering reads state; it never derives it.
+7. **The bundle is built and executed in tests.** `src/webview/bundle.test.ts` builds `main.ts` with esbuild and runs it against a DOM stub, asserting zero warnings and a working render. A module-scope crash otherwise ships with a fully green suite.
+8. **Accessibility.** Toggle controls carry `aria-pressed`; icon/repeated-label buttons carry a distinguishing `aria-label`. Colour alone never conveys tier — the text badge does.
+
 ## Files
 
 - `src/webview/styles.css` — all styling (single file, no CSS-in-JS)
-- `src/webview/main.ts` — rendering + state (vanilla TS, no framework)
-- `src/panel.ts` — HTML shell, CSP, message plumbing
+- `src/webview/main.ts` — rendering (vanilla TS, no framework)
+- `src/webview/state.ts` — pure view-state reducer + banner text
+- `src/panel.ts` — HTML shell, CSP, lifecycle, message plumbing
+- `src/webview/tsconfig` boundary: `tsconfig.webview.json` is the only project with the `DOM` lib. The root `tsconfig.json` excludes `src/webview`, so extension-host code touching `document`/`window` fails to compile. `npm run check-types` runs both.

@@ -18,6 +18,14 @@ const esbuildProblemMatcherPlugin = {
 				console.error(`✘ [ERROR] ${text}`);
 				console.error(`    ${location.file}:${location.line}:${location.column}:`);
 			});
+			// logLevel is 'silent' so esbuild prints nothing itself; without this, warnings
+			// (unused imports, unreachable code, suspicious CSS) vanish entirely.
+			result.warnings.forEach(({ text, location }) => {
+				console.warn(`▲ [WARNING] ${text}`);
+				if (location) {
+					console.warn(`    ${location.file}:${location.line}:${location.column}:`);
+				}
+			});
 			console.log('[watch] build finished');
 		});
 	},

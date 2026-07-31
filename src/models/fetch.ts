@@ -59,8 +59,25 @@ export async function fetchLiveModels(
 	return dedupeByName(out);
 }
 
+const NUMERIC_FIELDS = ['paramsB', 'estimatedSizeGB', 'minRamGB', 'downloads', 'likes'] as const;
+const STRING_FIELDS = ['name', 'modelId', 'hfUrl'] as const;
+
+/**
+ * Runtime shape check for a catalog row. `import catalog from './catalog.json'` is typed by
+ * inference, so a hand-edit that drops or mistypes a field type-checks fine and only surfaces
+ * as `NaN` in the UI — this is the guard that catches it instead.
+ */
+export function isModelRecommendation(value: unknown): value is ModelRecommendation {
+	if (typeof value !== 'object' || value === null) {
+		return false;
+	}
+	const row = value as Record<string, unknown>;
+	return STRING_FIELDS.every((f) => typeof row[f] === 'string')
+		&& NUMERIC_FIELDS.every((f) => typeof row[f] === 'number' && Number.isFinite(row[f]));
+}
+
 export function loadFallbackCatalog(): ModelRecommendation[] {
-	return catalog as ModelRecommendation[];
+	return (catalog as unknown[]).filter(isModelRecommendation);
 }
 
 export async function getRecommendations(
@@ -81,8 +98,13 @@ export async function getRecommendations(
 		return { models: scoreModels(dedupeByName(live), hw), source: 'live' };
 	}
 
-	const primaryError = hfResult.status === 'rejected' ? hfResult.reason
-		: gpt4AllResult.status === 'rejected' ? gpt4AllResult.reason
-		: undefined;
+	// Both sources answering successfully with nothing usable is an upstream/index problem —
+	// reporting it as a network failure would blame the user's connection for someone else's bug.
+	const bothAnswered = hfResult.status === 'fulfilled' && gpt4AllResult.status === 'fulfilled';
+	if (bothAnswered) {
+		return { models: scoreModels(loadFallbackCatalog(), hw), source: 'fallback', reason: 'empty' };
+	}
+
+	const primaryError = hfResult.status === 'rejected' ? hfResult.reason : (gpt4AllResult as PromiseRejectedResult).reason;
 	return { models: scoreModels(loadFallbackCatalog(), hw), source: 'fallback', reason: classifyFetchError(primaryError) };
 }

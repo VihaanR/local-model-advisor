@@ -95,9 +95,13 @@ function renderResults(): void {
 	}
 
 	const chips = el('div', 'chips');
+	chips.setAttribute('role', 'group');
+	chips.setAttribute('aria-label', 'Filter models by hardware fit');
 	const options: (FitTier | 'all')[] = ['all', 'gpu', 'hybrid', 'cpu'];
 	for (const opt of options) {
 		const chip = el('button', `chip${filter === opt ? ' active' : ''}`, opt === 'all' ? 'All' : TIER_LABEL[opt]);
+		// The active chip is styled, not just selected — screen readers need it stated explicitly.
+		chip.setAttribute('aria-pressed', String(filter === opt));
 		chip.addEventListener('click', () => { filter = opt; renderResults(); });
 		chips.append(chip);
 	}
@@ -124,6 +128,9 @@ function renderResults(): void {
 		actions.append(el('span', `badge tier-${m.tier}`, TIER_LABEL[m.tier]));
 		const copy = el('button', 'copy-btn', '⧉ ollama run');
 		copy.title = `Copy: ollama run hf.co/${m.modelId}`;
+		// Visible label is "⧉ ollama run" for every row — without this each button is
+		// indistinguishable to a screen reader.
+		copy.setAttribute('aria-label', `Copy ollama run command for ${m.modelId}`);
 		copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: `ollama run hf.co/${m.modelId}` }));
 		actions.append(copy);
 		row.append(actions);

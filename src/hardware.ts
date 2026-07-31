@@ -18,16 +18,21 @@ export function deriveHardware(raw: RawHardware): HardwareInfo {
 		(top, c) => (!top || (c.vram ?? 0) > (top.vram ?? 0) ? c : top),
 		null
 	);
+	const cpuModel = `${raw.cpu.manufacturer} ${raw.cpu.brand}`.trim();
 	let vramGB = best?.vram ? Math.round((best.vram / 1024) * 10) / 10 : 0;
+	let gpuModel = best?.model ?? null;
 	// Apple silicon: unified memory — the GPU can address most of system RAM.
 	if (/apple/i.test(raw.cpu.manufacturer)) {
 		vramGB = Math.round(ramGB * APPLE_UNIFIED_FRACTION * 10) / 10;
+		// The integrated GPU is always present on these chips even when no controller is
+		// reported; naming it keeps the UI from showing "None detected · 23.4 GB VRAM".
+		gpuModel = gpuModel ?? cpuModel;
 	}
 	return {
-		cpuModel: `${raw.cpu.manufacturer} ${raw.cpu.brand}`.trim(),
+		cpuModel,
 		physicalCores: raw.cpu.physicalCores,
 		ramGB,
-		gpuModel: best?.model ?? null,
+		gpuModel,
 		vramGB,
 	};
 }

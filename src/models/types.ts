@@ -26,7 +26,9 @@ export interface ScoredModel extends ModelRecommendation {
 
 export type CatalogSource = 'live' | 'fallback';
 
-export type FetchFailureReason = 'network' | 'auth' | 'rate-limit' | 'server' | 'unknown';
+/** `empty` means every live source answered successfully but yielded no usable model — an
+ *  upstream/index problem, distinct from a transport failure and from weak hardware. */
+export type FetchFailureReason = 'network' | 'auth' | 'rate-limit' | 'server' | 'empty' | 'unknown';
 
 export type ExtensionToWebview =
 	| { type: 'scanning' }

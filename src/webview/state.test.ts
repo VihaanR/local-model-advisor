@@ -48,6 +48,7 @@ describe('fallbackBannerText', () => {
 		expect(fallbackBannerText('rate-limit')).toMatch(/rate limit/i);
 		expect(fallbackBannerText('server')).toMatch(/issues/i);
 		expect(fallbackBannerText('network')).toMatch(/unreachable/i);
+		expect(fallbackBannerText('empty')).toMatch(/no usable entries/i);
 		expect(fallbackBannerText(undefined)).toMatch(/unreachable/i);
 	});
 });

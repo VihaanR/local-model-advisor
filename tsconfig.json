@@ -2,12 +2,14 @@
 	"compilerOptions": {
 		"module": "Node16",
 		"target": "ES2022",
-		"lib": ["ES2022", "DOM"],
+		"lib": ["ES2022"],
 		"sourceMap": true,
 		"rootDir": "src",
 		"strict": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true
 	},
-	"include": ["src"]
+	"include": ["src"],
+	"//": "src/webview is a browser bundle, type-checked by tsconfig.webview.json with the DOM lib. Excluding it here means extension-host code that reaches for `document` or `window` fails to compile instead of silently type-checking.",
+	"exclude": ["src/webview"]
 }

@@ -115,7 +115,6 @@ body::after {
 }
 .model-name:hover { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 240, 255, 0.6); }
 .model-meta { color: var(--text-dim); font-size: 11px; margin-top: 4px; }
-.model-meta b { color: var(--text); font-weight: normal; }
 
 .row-actions { display: flex; align-items: center; gap: 10px; }
 .badge {

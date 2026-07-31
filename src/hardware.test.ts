@@ -31,5 +31,24 @@ describe('deriveHardware', () => {
 			graphics: { controllers: [{ model: 'Apple M3 Pro', vram: null }] },
 		});
 		expect(hw.vramGB).toBeCloseTo(23.4, 1);
+		expect(hw.gpuModel).toBe('Apple M3 Pro');
+	});
+	it('never reports unified VRAM without naming a GPU, even with no controller reported', () => {
+		const hw = deriveHardware({
+			cpu: { manufacturer: 'Apple', brand: 'M2', physicalCores: 8 },
+			mem: { total: 16 * GB },
+			graphics: { controllers: [] },
+		});
+		expect(hw.vramGB).toBeGreaterThan(0);
+		expect(hw.gpuModel).toBe('Apple M2');
+	});
+	it('still reports no GPU on a non-Apple machine with no controller reported', () => {
+		const hw = deriveHardware({
+			cpu: { manufacturer: 'Intel', brand: 'i7-12700', physicalCores: 12 },
+			mem: { total: 16 * GB },
+			graphics: { controllers: [] },
+		});
+		expect(hw.gpuModel).toBeNull();
+		expect(hw.vramGB).toBe(0);
 	});
 });

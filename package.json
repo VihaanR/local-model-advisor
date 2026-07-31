@@ -30,6 +30,10 @@
     "type": "git",
     "url": "https://github.com/VihaanR/local-model-advisor"
   },
+  "homepage": "https://github.com/VihaanR/local-model-advisor#readme",
+  "bugs": {
+    "url": "https://github.com/VihaanR/local-model-advisor/issues"
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -49,11 +53,12 @@
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "watch:tsc-webview": "tsc --noEmit --watch --project tsconfig.webview.json",
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc --noEmit && tsc --noEmit --project tsconfig.webview.json",
     "lint": "eslint src",
     "test": "vscode-test",
     "test:unit": "vitest run"
@@ -68,7 +73,6 @@
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
     "npm-run-all": "^4.1.5",
-    "sharp": "^0.35.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.1.10"

@@ -18,7 +18,7 @@ description: Use when packaging, versioning, or publishing Local Model Advisor t
 ## Identity invariants
 
 - `publisher` in `package.json` must EXACTLY match the publisher ID created at https://marketplace.visualstudio.com/manage (default: `vihaan-raut`).
-- `icon` → `media/icon.png` (PNG only — marketplace rejects SVG). Regenerate from source: `node scripts/render-icon.mjs` (renders `media/icon.svg` via sharp).
+- `icon` → `media/icon.png` (PNG only — marketplace rejects SVG). `media/icon.png` is committed. To regenerate from `media/icon.svg`: `npm i --no-save sharp && node scripts/render-icon.mjs` — `sharp` is intentionally not a devDependency (large platform binary, would slow/break `npm ci` in CI for a script that runs once per icon change).
 - `repository.url` must point at a real, pushed GitHub repo or the listing loses its links.
 
 ## Secrets (never in the repo — grep for `hf_` and PAT-like strings before pushing)

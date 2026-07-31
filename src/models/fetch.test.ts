@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchLiveModels, loadFallbackCatalog, getRecommendations, classifyFetchError, HttpError } from './fetch';
+import rawCatalog from './catalog.json';
+import { fetchLiveModels, loadFallbackCatalog, getRecommendations, classifyFetchError, isModelRecommendation, HttpError } from './fetch';
 import type { HardwareInfo } from './types';
 
 const hw: HardwareInfo = { cpuModel: 'x', physicalCores: 8, ramGB: 32, gpuModel: 'g', vramGB: 12 };
@@ -83,6 +84,34 @@ describe('loadFallbackCatalog', () => {
 		expect(cat.length).toBeGreaterThanOrEqual(10);
 		expect(cat.every((m) => m.estimatedSizeGB > 0 && m.modelId.includes('/'))).toBe(true);
 	});
+	it('keeps every bundled row — the shipped catalog is well-formed', () => {
+		expect(loadFallbackCatalog()).toHaveLength(rawCatalog.length);
+	});
+});
+
+describe('isModelRecommendation', () => {
+	const valid = {
+		name: 'm', modelId: 'a/m', paramsB: 7, estimatedSizeGB: 4.2, minRamGB: 9,
+		downloads: 10, likes: 1, hfUrl: 'https://huggingface.co/a/m',
+	};
+	it('accepts a fully-formed row', () => {
+		expect(isModelRecommendation(valid)).toBe(true);
+	});
+	it('rejects a row with a field of the wrong type', () => {
+		expect(isModelRecommendation({ ...valid, estimatedSizeGB: '4.2' })).toBe(false);
+	});
+	it('rejects a row with a missing field', () => {
+		const { minRamGB, ...missing } = valid;
+		void minRamGB;
+		expect(isModelRecommendation(missing)).toBe(false);
+	});
+	it('rejects a NaN numeric field', () => {
+		expect(isModelRecommendation({ ...valid, paramsB: Number.NaN })).toBe(false);
+	});
+	it('rejects non-objects', () => {
+		expect(isModelRecommendation(null)).toBe(false);
+		expect(isModelRecommendation('a/m')).toBe(false);
+	});
 });
 
 describe('getRecommendations', () => {
@@ -111,6 +140,21 @@ describe('getRecommendations', () => {
 		const names = models.map((m) => m.name);
 		expect(names).toContain('Foo Model');
 		expect(names.some((n) => n.includes('Bar-Model'))).toBe(true);
+	});
+
+	it('blames the upstream index, not the hardware, when both sources answer with nothing usable', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+		const { models, source, reason } = await getRecommendations(hw);
+		expect(source).toBe('fallback');
+		expect(reason).toBe('empty');
+		expect(models.length).toBeGreaterThan(0);
+	});
+
+	it('reports the transport failure reason, not "empty", when a source actually errored', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new HttpError(429)));
+		const { source, reason } = await getRecommendations(hw);
+		expect(source).toBe('fallback');
+		expect(reason).toBe('rate-limit');
 	});
 
 	it('still returns a live pool from whichever source succeeds if the other fails', async () => {
