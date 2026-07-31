@@ -1,0 +1,27 @@
+name: Publish
+
+# Manual only. Publishes the version currently in package.json to the VS Code Marketplace.
+# Requires the VSCE_PAT repo secret (Azure DevOps PAT, scope: Marketplace > Manage).
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Never publish an unverified build — these are the same gates CI enforces.
+      - run: npm run lint
+      - run: npm run check-types
+      - run: npm run test:unit
+      # PAT passed via env, not argv, so it cannot surface in process listings or error output.
+      - run: npx vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
