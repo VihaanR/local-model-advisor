@@ -92,4 +92,35 @@ describe('getRecommendations', () => {
 		expect(source).toBe('fallback');
 		expect(models.length).toBeGreaterThan(0);
 	});
+
+	it('merges Hugging Face and GPT4All results into one live pool', async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url.includes('gpt4all.io')) {
+				return { ok: true, json: async () => [{
+					name: 'Foo Model',
+					url: 'https://huggingface.co/someone/Foo-Model-GGUF/resolve/main/foo.Q4_0.gguf',
+					filesize: '4000000000',
+					parameters: '7 billion',
+				}] };
+			}
+			return { ok: true, json: async () => [{ modelId: 'bartowski/Bar-Model-8B-GGUF', downloads: 50, likes: 1 }] };
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const { models, source } = await getRecommendations(hw);
+		expect(source).toBe('live');
+		const names = models.map((m) => m.name);
+		expect(names).toContain('Foo Model');
+		expect(names.some((n) => n.includes('Bar-Model'))).toBe(true);
+	});
+
+	it('still returns a live pool from whichever source succeeds if the other fails', async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url.includes('gpt4all.io')) { throw new Error('gpt4all down'); }
+			return { ok: true, json: async () => [{ modelId: 'bartowski/Bar-Model-8B-GGUF', downloads: 50, likes: 1 }] };
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const { models, source } = await getRecommendations(hw);
+		expect(source).toBe('live');
+		expect(models.length).toBeGreaterThan(0);
+	});
 });

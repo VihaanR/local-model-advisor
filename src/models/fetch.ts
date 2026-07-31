@@ -1,28 +1,21 @@
 import catalog from './catalog.json';
-import { CPU_OVERHEAD_GB, OS_RESERVE_FRACTION } from './constants';
+import { CPU_OVERHEAD_GB, OS_RESERVE_FRACTION, TIMEOUT_MS } from './constants';
+import { dedupeByName } from './dedupe';
+import { HttpError, classifyFetchError } from './errors';
 import { estimateSizeGB, parseParamCount } from './estimate';
+import { fetchGpt4AllModels } from './gpt4all';
 import { scoreModels } from './score';
 import type { CatalogSource, FetchFailureReason, HardwareInfo, ModelRecommendation, ScoredModel } from './types';
 
-const HF_ENDPOINT = 'https://huggingface.co/api/models?filter=gguf&pipeline_tag=text-generation&sort=downloads&limit=100';
-const TIMEOUT_MS = 10_000;
+export { HttpError, classifyFetchError };
 
-export class HttpError extends Error {
-	constructor(public readonly status: number) {
-		super(`Hugging Face API returned ${status}`);
-	}
-}
+const HF_ENDPOINT = 'https://huggingface.co/api/models?filter=gguf&pipeline_tag=text-generation&sort=downloads&limit=100';
 
 interface HfRow {
 	modelId?: string;
 	id?: string;
 	downloads?: number;
 	likes?: number;
-}
-
-/** Normalizes a model name to its underlying base so re-packaged quantizations collapse together. */
-function normalizeBaseName(name: string): string {
-	return name.toLowerCase().replace(/-gguf$/i, '').replace(/[^a-z0-9]+/g, '');
 }
 
 export async function fetchLiveModels(
@@ -37,7 +30,7 @@ export async function fetchLiveModels(
 		signal: opts.signal ?? AbortSignal.timeout(TIMEOUT_MS),
 	});
 	if (!res.ok) {
-		throw new HttpError(res.status);
+		throw new HttpError(res.status, `Hugging Face API returned ${res.status}`);
 	}
 	const rows = (await res.json()) as HfRow[];
 	const out: ModelRecommendation[] = [];
@@ -63,42 +56,33 @@ export async function fetchLiveModels(
 		});
 	}
 
-	const bestByName = new Map<string, ModelRecommendation>();
-	for (const rec of out) {
-		const key = normalizeBaseName(rec.name);
-		const existing = bestByName.get(key);
-		if (!existing || rec.downloads > existing.downloads) {
-			bestByName.set(key, rec);
-		}
-	}
-	return Array.from(bestByName.values());
+	return dedupeByName(out);
 }
 
 export function loadFallbackCatalog(): ModelRecommendation[] {
 	return catalog as ModelRecommendation[];
 }
 
-export function classifyFetchError(err: unknown): FetchFailureReason {
-	if (err instanceof HttpError) {
-		if (err.status === 401 || err.status === 403) { return 'auth'; }
-		if (err.status === 429) { return 'rate-limit'; }
-		if (err.status >= 500) { return 'server'; }
-		return 'unknown';
-	}
-	if (err instanceof DOMException && err.name === 'AbortError') { return 'network'; }
-	if (err instanceof TypeError) { return 'network'; }
-	return 'unknown';
-}
-
 export async function getRecommendations(
 	hw: HardwareInfo,
 	opts: { token?: string } = {}
 ): Promise<{ models: ScoredModel[]; source: CatalogSource; reason?: FetchFailureReason }> {
-	let live: ModelRecommendation[];
-	try {
-		live = await fetchLiveModels(opts);
-	} catch (err) {
-		return { models: scoreModels(loadFallbackCatalog(), hw), source: 'fallback', reason: classifyFetchError(err) };
+	const [hfResult, gpt4AllResult] = await Promise.allSettled([
+		fetchLiveModels(opts),
+		fetchGpt4AllModels(),
+	]);
+
+	const live: ModelRecommendation[] = [
+		...(hfResult.status === 'fulfilled' ? hfResult.value : []),
+		...(gpt4AllResult.status === 'fulfilled' ? gpt4AllResult.value : []),
+	];
+
+	if (live.length > 0) {
+		return { models: scoreModels(dedupeByName(live), hw), source: 'live' };
 	}
-	return { models: scoreModels(live, hw), source: 'live' };
+
+	const primaryError = hfResult.status === 'rejected' ? hfResult.reason
+		: gpt4AllResult.status === 'rejected' ? gpt4AllResult.reason
+		: undefined;
+	return { models: scoreModels(loadFallbackCatalog(), hw), source: 'fallback', reason: classifyFetchError(primaryError) };
 }
