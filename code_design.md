@@ -10,29 +10,29 @@
 
 ---
 
-## BUILD STATUS — updated 2026-07-30 (fix wave 1 landed)
+## BUILD STATUS — updated 2026-07-30 (Task 12 landed)
 
 ### 🔴 RESUME HERE (next session)
 
-**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, committed (`ccb4613`), and PUSHED to `origin/master`** (along with doc updates `62367ec`/`14b3677`). The only pre-existing gates before publishing are D4 (2 human-only tasks: screenshot + local `.vsix` install check) and Task 11 (CI + Marketplace publish).
+**Everything shipped so far is DONE and independently reviewed. One commit is local-only, not yet pushed: `dd87c02` (Task 12).**
 
-**New, not yet started: Task 12 — GPT4All as a second live catalog source.** Fully planned (search this file for "Task 12: Second live catalog source", in the Implementation Tasks section, right after Task 11) with exact code, TDD steps, and 5 locked-in design decisions, at the user's request to broaden the model pool beyond Hugging Face alone. Independent of Task 11/D4 — can be done in any order relative to those. Not yet dispatched to an implementer.
+- **Fix wave 1** (C1 + I1–I6, all 7 ship-blocking findings from Part D's final review): DONE, reviewed, committed `ccb4613`, pushed.
+- **Task 12** (GPT4All as a second live catalog source, at the user's request to broaden the model pool beyond Hugging Face alone): DONE, reviewed, committed `dd87c02`, **not yet pushed**. `getRecommendations` now fetches Hugging Face and GPT4All in parallel (`Promise.allSettled`), merges + de-dupes, only falls back to `catalog.json` if both fail. Zero changes outside `src/models/*` + one skill doc — `extension.ts`/`panel.ts`/webview untouched.
 
-What happened: a fix-wave implementer subagent was dispatched with a fully-specified brief (`.superpowers/sdd/fix-wave-1-brief.md`, still on disk, gitignored) covering all 7 items with exact code. It implemented all 7, flagged one deviation (the brief's own `MOE_ACTIVE_PATTERN` regex for I6 didn't satisfy the brief's own second test case for reversed MoE active/total ordering — verified independently by the controller with a scratch script before accepting), and committed as `ccb4613`. An independent task-reviewer subagent then re-ran `npm run check-types`/`lint`/`test:unit`/`compile` itself (not trusting the implementer's report), verified all 7 items against the brief item-by-item, confirmed the commit has no AI/Claude attribution, and confirmed zero scope creep. Verdict: **approved, task complete.**
+Both used the same process: a fully-specified brief with exact code dispatched to an implementer subagent, then an independent reviewer subagent that re-ran `check-types`/`lint`/`test:unit`/`compile` itself (never trusting the implementer's report) and checked every requirement line-by-line. Both came back approved with zero required fix rounds. Test suite is now 7 files / 47 tests, all green.
 
 To resume:
 
-1. `git log -1 ccb4613` to confirm this is still `HEAD` (should be, tree was clean before and after).
-2. Decide: push now, or do D4's two human-only tasks first and push together. Either is fine — D4 no longer has any code dependency on this fix wave.
-3. `git push origin master`.
-4. Then D4 (screenshot + local `.vsix` install sanity check) if not already done, then optionally Task 11.
+1. `git log --oneline origin/master..HEAD` — should show only `dd87c02` and its doc-update commit as unpushed. If so, decide: push now, or bundle with D4's two human-only tasks first.
+2. `git push origin master`.
+3. Remaining gates before Marketplace publish: **D4** (2 human-only tasks — screenshot capture, local `.vsix` install sanity check) and **Task 11** (CI + publish workflow, needs a Marketplace publisher ID + Azure DevOps PAT). Neither depends on Task 12.
 
-Minors (D3) and the process lesson (D6) are still optional polish — do not block on them. D6's `constants.ts` recommendation was already implemented as part of fix wave 1 (see Item 1 in the brief) — the rest of D6 (a lifecycle checklist in `.claude/skills/neon-webview-ui`) is still open but genuinely optional.
+Minors (D3) and the process lesson (D6) are still optional polish — do not block on them. D6's `constants.ts` recommendation was already implemented in fix wave 1.
 
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
-- **Local branch:** `master`, tracking `origin/master`, in sync as of `62367ec` (fix wave 1 `ccb4613` + doc update `62367ec` both pushed). Verify with `git log origin/master..HEAD` before assuming otherwise.
+- **Local branch:** `master`, tracking `origin/master`, **1-2 commits ahead** (`dd87c02` Task 12 + its doc-update commit) — not yet pushed as of this update. Verify with `git log origin/master..HEAD` before assuming otherwise.
 - **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
 - **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
 
@@ -84,9 +84,10 @@ Re-verified independently by the task reviewer after fix wave 1 (state as of com
 | *(post-review)* docs: resume-here + repo-state update | ✅ | `de95372` |
 | *(post-review)* **Fix wave 1: C1 + I1–I6 (all 7 ship-blocking findings)** | ✅ implemented + independently reviewed, approved | `ccb4613` |
 | *(post-review)* docs: fix wave 1 status updates | ✅ | `62367ec`, `14b3677` |
-| **12 — GPT4All second live source** | 📋 planned, not started | — |
+| *(post-review)* docs: Task 12 plan added | ✅ | `bd9ccb7` |
+| **12 — GPT4All second live source** | ✅ implemented + independently reviewed, approved | `dd87c02` |
 
-Full commit range so far: `c136d34` (baseline) .. `14b3677` (latest), 19 commits, all on `master`, all pushed to `origin`.
+Full commit range so far: `c136d34` (baseline) .. `dd87c02` (latest), 21 commits, all on `master`. **20 of 21 pushed to `origin`; `dd87c02` is local-only, waiting on a push decision.**
 
 Deviations from this plan that were made deliberately during execution, and why:
 
