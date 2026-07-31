@@ -2201,7 +2201,23 @@ Never mutate the input — return a copy. **Every comparator falls back to `scor
 - `gpt4all.ts` — `provider: 'gpt4all'`.
 - `constants.ts` — move `MAX_RESULTS` out of `score.ts`, set to **200**; add `PAGE_SIZE = 25`.
 - `score.ts` — keep the `none`-tier drop and score ordering, slice at the new `MAX_RESULTS`, attach `family`/`company` via `classifyModel`.
-- `fetch.ts` — raise HF `limit=100` → **`limit=200`**. ⚠️ **Verify at implementation time** that the endpoint honours the larger limit and still returns inside `TIMEOUT_MS` (10s). If it does not, fall back to 100 and say so — do not silently ship a timeout.
+- `fetch.ts` — raise HF `limit=100` → **`limit=500`**.
+
+**✅ Measured against the live endpoint on 2026-07-31 — this is no longer a risk, do not re-derive it:**
+
+| `limit` | rows | parseable size | after de-dupe | time | payload |
+|---|---|---|---|---|---|
+| 100 *(current)* | 100 | 85 | **68** | 859ms† | 0.05 MB |
+| 200 | 200 | 162 | **125** | 281ms | 0.10 MB |
+| 300 | 300 | 237 | **177** | 293ms | 0.15 MB |
+| **500** | 500 | 410 | **318** | 412ms | 0.26 MB |
+| 1000 | 1000 | 808 | **659** | 424ms | 0.54 MB |
+
+† cold-start DNS/TLS; steady state is ~300–400ms at every size.
+
+The endpoint honours every limit tested, and latency is flat — ~24× headroom against `TIMEOUT_MS`. **`limit=500` is chosen over 1000 for result *quality*, not performance**: sorted by downloads, rank 500+ is obscure repackagings. 500 yields ~318 usable models pre-hardware-filter, which `MAX_RESULTS = 200` then caps to 8 pages of 25 — ample.
+
+Note this also explains the original complaint: at `limit=100` the pool was **already 68 usable models** and `MAX_RESULTS = 12` was showing 12 of them. The cap was the bottleneck, not the fetch.
 
 Existing tests construct model literals and will fail to compile once `provider` is required. Updating them is mechanical — **do not weaken the types to avoid it.** Note `score.test.ts` currently asserts `toHaveLength(12)`; that assertion changes meaning and must be rewritten against `MAX_RESULTS`.
 
@@ -2310,7 +2326,7 @@ git commit -m "feat: sidebar webview with paginated results and sorting"
 #### Risks
 
 1. **`taxonomy.ts` is a hand-maintained list** that goes stale as new families ship. Unmatched names degrade to `Other`/`Unknown` rather than breaking — the right failure mode — but the sort is only as good as the table.
-2. **HF `limit=200` is unverified.** If the endpoint caps it or slows past `TIMEOUT_MS`, fall back to 100 and report it.
+2. ~~**HF limit is unverified.**~~ **RESOLVED 2026-07-31** — probed the live endpoint at 100/200/300/500/1000. All limits are honoured, latency is flat at ~300–400ms (~24× headroom against `TIMEOUT_MS`), payload ≤0.54 MB. `limit=500` chosen for result quality, not performance. See the measurement table in Step 4.
 3. **The view-lifecycle rewrite is where the shipped C1/I1/I2 fixes live.** Porting them is not optional, and the `ready` handshake is genuinely new surface — the riskiest part of this task after taxonomy.
 
 ---
