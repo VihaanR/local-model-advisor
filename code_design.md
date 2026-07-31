@@ -26,8 +26,7 @@ To resume:
    - `code --install-extension local-model-advisor-<version>.vsix` (0.2.0 once Task 13 lands), then open the sidebar once from the installed build.
 3. **Task 11 Step 3 — external accounts only**: create the Marketplace publisher (ID must match `publisher: "vihaan-raut"` in `package.json`) and an Azure DevOps PAT. Then either `npx vsce login vihaan-raut && npx vsce publish`, or add the PAT as the `VSCE_PAT` repo secret and run the Publish workflow. The workflows themselves are written and committed.
 
-Nothing in Part D is outstanding any more except D4.
-
+Nothing in Part D is outstanding any more except D4.-=-===
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
@@ -2128,7 +2127,7 @@ Company and family must be derived from the model **name** via a curated pattern
 | Sort options | Recommended (default), Params ↓, Params ↑, Most downloaded, Size ↑, Name A–Z, Source site, Company of origin, Model family |
 
 **Files:**
-- Create: `src/models/taxonomy.ts` + `.test.ts`, `src/models/sort.ts` + `.test.ts`, `src/webview/paginate.ts` + `.test.ts`, `src/view.ts`, `media/sidebar-icon.svg`
+- Create: `src/models/taxonomy.ts` + `.test.ts`, `src/models/sort.ts` + `.test.ts`, `src/webview/paginate.ts` + `.test.ts`, `src/view.ts` + `src/view.test.ts` (lifecycle core — see Risk 3), `media/sidebar-icon.svg`
 - Delete: `src/panel.ts`
 - Modify: `src/models/types.ts`, `constants.ts`, `score.ts`, `fetch.ts`, `gpt4all.ts`, `src/extension.ts`, `src/webview/{main,state,styles.css,bundle.test.ts}`, `package.json`, `tsconfig.webview.json`, `README.md`, `CHANGELOG.md`, `.claude/skills/model-recommendation-logic/SKILL.md`
 
@@ -2145,43 +2144,56 @@ export type ModelProvider = 'huggingface' | 'gpt4all';
 export interface ModelRecommendation {
 	/* …existing fields… */
 	provider: ModelProvider;      // which catalog it came from
+	company: string;              // 'Alibaba' | 'Meta' | 'deepreinforce-ai' | … | 'Unknown'
+	family: string;               // 'Qwen3' | 'Llama-3.1' | 'Ornith-1.0' | …
 }
 
 export interface ScoredModel extends ModelRecommendation {
 	tier: FitTier;
 	score: number;
-	family: string;               // 'Llama' | 'Qwen' | 'GLM' | 'Kimi' | … | 'Other'
-	company: string;              // 'Meta' | 'Alibaba' | 'Google' | … | 'Unknown'
 }
 ```
 
-`provider` is a fact about the source, so the **fetcher** sets it. `family`/`company` are *derived* presentation metadata, so they are attached during **scoring** — this deliberately keeps `catalog.json` and the `isModelRecommendation` guard untouched.
+All three are set by the **fetcher**, not by scoring. `company`/`family` are resolved from the HF `base_model:` tag (Step 2), and **tags only exist at fetch time** — so resolving later would throw away the signal.
+
+Consequences to handle, not to work around:
+
+- `HfRow` must capture `tags?: string[]` (already present in the default response — no extra request).
+- **`catalog.json` gains explicit `company` and `family` fields on all 12 rows.** Its entries are mostly repackager-owned (`bartowski/…`) with no tags, so lineage cannot be resolved for them; they are hand-curated anyway. Extend `isModelRecommendation`'s `STRING_FIELDS` accordingly — the existing "keeps every bundled row" test will fail loudly if a row is missed, which is the guard working as designed.
+- GPT4All rows have no tags; use the owner from their `huggingface.co/{owner}/{repo}/resolve/…` URL.
 
 Protocol changes in the same file: rename `WebviewToExtension` `{ type: 'rescan' }` → `{ type: 'scan' }` (the button reads "SCAN" before the first run), and add `{ type: 'ready' }`. `ExtensionToWebview` is unchanged.
 
-- [ ] **Step 2: `src/models/taxonomy.ts` (TDD)**
+- [ ] **Step 2: `src/models/taxonomy.ts` (TDD) — lineage-based, NOT a name-regex table**
 
-An **ordered** array of `{ pattern: RegExp, family, company }` matched against the model **name**. Seed from the families actually present in the live pool and `catalog.json`:
+> ⚠️ **This step was redesigned on 2026-07-31 after measuring both approaches against the real 318-model live pool. Do not revert to the name-regex table.**
+>
+> | Approach | Coverage | Failure mode |
+> |---|---|---|
+> | Ordered regex table matched on the model **name** *(originally planned)* | **74.5%** | Fabricates attribution, or dumps 25% into `Other`/`Unknown` |
+> | **`base_model:` tag → owner, else own owner** *(chosen)* | **91.8%** | Degrades to the model's real org slug — accurate, never invented |
+>
+> Measured: **91.2%** of pool rows carry a `base_model:` tag, and **32.1%** of owner segments are repackagers. Crucially, `tags` is **already in the default listing response** — resolving lineage costs **zero extra API calls**.
+>
+> The regex table also could not attribute genuinely new families at all (`Ornith-1.0`, `Bonsai`, `Qwythos`, `VertaLily`, `Hy3`), and guessing their company would be fabrication. The lineage approach resolves `Ornith-1.0-9B-GGUF` → `deepreinforce-ai` from data.
 
-| Pattern | Family | Company |
-|---|---|---|
-| `llama`, `tinyllama` | Llama | Meta |
-| `qwen`, `qwq` | Qwen | Alibaba |
-| `gemma` | Gemma | Google |
-| `mistral`, `mixtral`, `magistral` | Mistral | Mistral AI |
-| `phi` | Phi | Microsoft |
-| `deepseek` | DeepSeek | DeepSeek |
-| `kimi` | Kimi | Moonshot AI |
-| `glm`, `chatglm` | GLM | Z.ai |
-| `gpt-oss` | GPT-OSS | OpenAI |
-| `granite` | Granite | IBM |
-| `nemotron` | Nemotron | NVIDIA |
-| `smollm` | SmolLM | Hugging Face |
-| `falcon` | Falcon | TII |
-| `yi-` | Yi | 01.AI |
-| *(no match)* | `Other` | `Unknown` |
+**Algorithm** — `resolveOrigin({ modelId, tags }): { company: string; family: string }`:
 
-**Order matters and must be tested.** `DeepSeek-R1-Distill-Qwen-7B` matches both `deepseek` and `qwen` — DeepSeek must win, because it is the distributing family. Pin that exact case, plus `bartowski/gemma-2-9b-it-GGUF` → Google (proving the owner is ignored) and an unmatched name → `Other`/`Unknown`.
+1. Find a `base_model:` tag; strip the `quantized:` / `finetune:` / `adapter:` / `merge:` sub-prefix to get `owner/repo`.
+2. `origin = baseModelOwner ?? modelIdOwner`.
+3. If `origin` is a known **repackager**, fall back to the other candidate; if both are repackagers, the origin is genuinely unknown.
+4. Map `origin` through a **cosmetic** slug→display-name table; unmapped slugs pass through verbatim.
+
+The curated part is therefore **presentation only, never correctness**. A slug this project has never seen still displays accurately as itself (`deepreinforce-ai`, `LiquidAI`, `janhq`) instead of being guessed at or blanked. That is what removes the staleness risk.
+
+**Repackager set** (their owner segment is never the origin) — from the measured pool: `bartowski`, `TheBloke`, `mradermacher`, `lmstudio-community`, `unsloth`, `huihui-ai`, `dphn`, `QuantFactory`, `tensorblock`, `second-state`, `featherless-ai-quants`, `ggml-org`, `nold`.
+
+**Cosmetic display map** (extend freely; unmapped = pass through):
+`Qwen`→Alibaba · `meta-llama`→Meta · `google`→Google · `mistralai`→Mistral AI · `deepseek-ai`→DeepSeek · `microsoft`→Microsoft · `nvidia`→NVIDIA · `openai`→OpenAI · `01-ai`→01.AI · `ibm-granite`→IBM · `LiquidAI`→Liquid AI · `NousResearch`→Nous Research · `janhq`→Jan · `moonshotai`→Moonshot AI · `zai-org`→Z.ai
+
+**Family** comes from the base-model repo name (e.g. `Qwen/Qwen3-8B` → `Qwen3`), falling back to the model's own name with the quant/size/`-GGUF` suffixes stripped. Family is a *label*, so an imperfect one is cosmetically wrong, not factually wrong.
+
+**Tests to pin:** a repackager row with a `base_model:` tag resolves to the base owner, not the repackager; a first-party row with no tag resolves to its own owner; a row where *both* are repackagers resolves to unknown rather than naming a repackager; an unmapped slug passes through verbatim (this is the anti-fabrication guarantee); and `base_model:quantized:Qwen/Qwen3-8B` parses correctly.
 
 - [ ] **Step 3: `src/models/sort.ts` (TDD)**
 
@@ -2197,10 +2209,10 @@ Never mutate the input — return a copy. **Every comparator falls back to `scor
 
 - [ ] **Step 4: Fetchers set `provider`; raise the result ceiling**
 
-- `fetch.ts` — `provider: 'huggingface'` on each mapped row; `loadFallbackCatalog()` adds `provider: 'huggingface'` to validated rows (every `catalog.json` entry is a `huggingface.co` URL). The `isModelRecommendation` guard keeps validating the raw JSON shape and does **not** gain a `provider` check.
-- `gpt4all.ts` — `provider: 'gpt4all'`.
+- `fetch.ts` — add `tags?: string[]` to `HfRow`; set `provider: 'huggingface'` and resolve `company`/`family` via `resolveOrigin({ modelId, tags })` on each mapped row. `loadFallbackCatalog()` adds `provider: 'huggingface'` to validated rows (every `catalog.json` entry is a `huggingface.co` URL) and reads `company`/`family` straight from the JSON.
+- `gpt4all.ts` — `provider: 'gpt4all'`; resolve `company` from the owner in the HF resolve URL (no tags available) and `family` from the model name.
 - `constants.ts` — move `MAX_RESULTS` out of `score.ts`, set to **200**; add `PAGE_SIZE = 25`.
-- `score.ts` — keep the `none`-tier drop and score ordering, slice at the new `MAX_RESULTS`, attach `family`/`company` via `classifyModel`.
+- `score.ts` — unchanged apart from reading `MAX_RESULTS` from `constants.ts`: it keeps the `none`-tier drop and score ordering and no longer needs to attach anything, since the fetcher already did.
 - `fetch.ts` — raise HF `limit=100` → **`limit=500`**.
 
 **✅ Measured against the live endpoint on 2026-07-31 — this is no longer a risk, do not re-derive it:**
@@ -2325,9 +2337,18 @@ git commit -m "feat: sidebar webview with paginated results and sorting"
 
 #### Risks
 
-1. **`taxonomy.ts` is a hand-maintained list** that goes stale as new families ship. Unmatched names degrade to `Other`/`Unknown` rather than breaking — the right failure mode — but the sort is only as good as the table.
+1. ~~**`taxonomy.ts` is a hand-maintained list** that goes stale as new families ship.~~ **RESOLVED 2026-07-31 by redesigning Step 2.** Origin is now resolved from the HF `base_model:` tag (91.8% coverage, measured, zero extra API calls) instead of a name-regex table (74.5%, and it fabricated attribution for families it had never seen). The curated map is now cosmetic display names only; an unknown org degrades to its real slug. Residual: ~8% of rows whose `base_model` chain points at *another* repackager resolve to unknown — acceptable, and it under-claims rather than misattributes.
 2. ~~**HF limit is unverified.**~~ **RESOLVED 2026-07-31** — probed the live endpoint at 100/200/300/500/1000. All limits are honoured, latency is flat at ~300–400ms (~24× headroom against `TIMEOUT_MS`), payload ≤0.54 MB. `limit=500` chosen for result quality, not performance. See the measurement table in Step 4.
-3. **The view-lifecycle rewrite is where the shipped C1/I1/I2 fixes live.** Porting them is not optional, and the `ready` handshake is genuinely new surface — the riskiest part of this task after taxonomy.
+3. **The view-lifecycle rewrite is where the shipped C1/I1/I2 fixes live.** Porting them is not optional, and the `ready` handshake is genuinely new surface. With taxonomy resolved, **this is now the top risk** — and unlike the other two it cannot be settled by measurement, only by construction.
+
+   **Mitigation (do this, it is the point):** today `AdvisorPanel` is untestable because it calls `vscode.window.createWebviewPanel` directly, so every lifecycle guarantee rests on review alone — which is exactly how C1 shipped in the first place. Structure `view.ts` so the lifecycle rules live in a small **injectable core** that takes a minimal `{ postMessage }` sink plus explicit `onVisible` / `onDispose` / `onReady` triggers, with the `vscode` API wired in only at the edges. Then unit-test the four rules directly, no VS Code host required:
+
+   - `post()` after dispose is a silent no-op (I1)
+   - becoming visible re-posts the cached `lastMessage`, and posts nothing when there is none (C1)
+   - a result from a superseded scan generation is dropped (I2)
+   - `ready` replays `lastMessage`, and an early `post()` before `ready` is not lost (new)
+
+   That converts "we hope the port was faithful" into four assertions that fail loudly if it wasn't. The GUI pass in Step 8 then only has to confirm real VS Code wiring, not the logic.
 
 ---
 
