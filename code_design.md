@@ -10,20 +10,20 @@
 
 ---
 
-## BUILD STATUS — updated 2026-07-31 (fix wave 2: all remaining code work landed)
+## BUILD STATUS — updated 2026-07-31 (fix wave 2 landed; Task 13 planned, not started)
 
 ### 🔴 RESUME HERE (next session)
 
-**All code-side work in this plan is now COMPLETE. Everything that remains is human-only or needs external accounts.**
+**Tasks 1–12 are COMPLETE, reviewed and pushed. [Task 13](#task-13-sidebar-view-paginated-results-and-sorting---planned-not-started) is planned but NOT started — it is the next piece of work.**
 
-Fix wave 2 (this session) closed every outstanding *implementable* item: all 11 D3 minors, both D5 tripwires, Task 11's workflows, and D6's skill checklist. Test suite grew from 7 files / 47 tests to **9 files / 74 tests**, all green.
+Fix wave 2 closed every outstanding item from the original scope: all 11 D3 minors, both D5 tripwires, Task 11's workflows, and D6's skill checklist. Test suite grew from 7 files / 47 tests to **9 files / 74 tests**, all green, and everything is pushed to `origin/master`.
 
 To resume:
 
-1. `git push origin master` — 4 commits are unpushed (`bd9ccb7`, `dd87c02`, `438d631` from Task 12, plus fix wave 2).
-2. **D4 — the only work left that this environment cannot do** (both need a GUI; `code` is still not on PATH here):
-   - Capture `media/screenshot.png` (F5 → run the scan command → screenshot the panel). `README.md:14` links it, and vsce rewrites that path to `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png` — so it must be committed **and pushed** or the Marketplace listing shows a broken image.
-   - `code --install-extension local-model-advisor-0.1.0.vsix`, then run the command once from the installed build.
+1. **Implement [Task 13](#task-13-sidebar-view-paginated-results-and-sorting---planned-not-started)** — sidebar webview (replacing the editor tab), all fitting models paginated 25 per page behind a numbered pager, and a 9-option sort dropdown. A 0.2.0 minor release. Start at its Step 1; the decisions table near the top is already settled with the user and should not be relitigated.
+2. **D4 — work this environment cannot do** (both need a GUI; `code` is still not on PATH here). ⚠️ **Do these *after* Task 13**, not before: Task 13 replaces the editor tab with a sidebar, so a screenshot captured now would be obsolete immediately.
+   - Capture `media/screenshot.png` of the **sidebar** and re-add `![screenshot](media/screenshot.png)` to `README.md`. The broken reference was removed from the README on 2026-07-31 (the file never existed), so nothing renders broken in the meantime. When re-adding: vsce rewrites the relative path to `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png`, so the PNG must be committed **and pushed** — being inside the `.vsix` is not enough.
+   - `code --install-extension local-model-advisor-<version>.vsix` (0.2.0 once Task 13 lands), then open the sidebar once from the installed build.
 3. **Task 11 Step 3 — external accounts only**: create the Marketplace publisher (ID must match `publisher: "vihaan-raut"` in `package.json`) and an Azure DevOps PAT. Then either `npx vsce login vihaan-raut && npx vsce publish`, or add the PAT as the `VSCE_PAT` repo secret and run the Publish workflow. The workflows themselves are written and committed.
 
 Nothing in Part D is outstanding any more except D4.
@@ -31,7 +31,7 @@ Nothing in Part D is outstanding any more except D4.
 ### Repo state
 
 - **Remote:** `origin` → `https://github.com/VihaanR/local-model-advisor.git`, already pushed. `master` is the GitHub default branch.
-- **Local branch:** `master`, tracking `origin/master`, **4 commits ahead** (`bd9ccb7`, `dd87c02`, `438d631` from Task 12, plus fix wave 2) — not yet pushed as of this update. Verify with `git log origin/master..HEAD` before assuming otherwise.
+- **Local branch:** `master`, tracking `origin/master`, **in sync as of 2026-07-31** — Task 12 and fix wave 2 are both pushed (through `8a12744`). Verify with `git log origin/master..HEAD` before assuming otherwise.
 - **`.gitignore`:** broadened beyond the original 5-line version — now also excludes `coverage/`, `*.tsbuildinfo`, logs, `.env*`, OS cruft, and `.superpowers/` (Claude Code session scratch: task briefs, review diffs, progress ledger — intentionally never committed). `.claude/skills/**` is deliberately NOT ignored — those 3 files are checked-in project skills, not scratch.
 - **Git identity in this repo:** `VihaanR <vihaanmehulraut@gmail.com>` — already the configured `user.name`/`user.email`, so new commits are attributed correctly without any extra action.
 
@@ -96,7 +96,8 @@ Verified after fix wave 2 (all re-run in this session, not trusted from any repo
 | *(post-review)* docs: fix wave 1 status updates | ✅ | `62367ec`, `14b3677` |
 | *(post-review)* docs: Task 12 plan added | ✅ | `bd9ccb7` |
 | **12 — GPT4All second live source** | ✅ implemented + independently reviewed, approved | `dd87c02` |
-| *(post-review)* **Fix wave 2: all 11 D3 minors + D5 + D6 + Task 11 workflows** | ✅ implemented, full pipeline re-verified | fix wave 2 |
+| *(post-review)* **Fix wave 2: all 11 D3 minors + D5 + D6 + Task 11 workflows** | ✅ implemented, full pipeline re-verified | `0d0e729`, `711ac45`, `8a12744` |
+| **13 — Sidebar view, pagination, sorting** | 📋 planned, not started | — |
 
 Full commit range so far: `c136d34` (baseline) .. `dd87c02` (latest), 21 commits, all on `master`. **20 of 21 pushed to `origin`; `dd87c02` is local-only, waiting on a push decision.**
 
@@ -2101,6 +2102,219 @@ git commit -m "feat: add GPT4All as a second live catalog source, merged and de-
 
 ---
 
+### Task 13: Sidebar view, paginated results, and sorting — 📋 PLANNED (not started)
+
+> Not blocked on anything external. Grew out of a user request with three parts: move the UI off the editor tab into the **sidebar** (with the scan button in it), stop capping results at 12, and add **sorting**. This is a **0.2.0 minor release** — it removes a user-visible surface (the editor tab) and changes the primary entry point.
+
+**Why:** the advisor is a reference panel you consult while working, so an editor tab is the wrong home for it. `MAX_RESULTS = 12` is an arbitrary slice of a pool that is realistically 60–150 models after filtering, with no way to see the rest and no way to reorder them.
+
+#### The one non-obvious finding — read before writing `taxonomy.ts`
+
+"Sort by company of origin" **cannot be read off the model id.** The Hugging Face owner is usually a *repackager*, not the creator — verified against the real `catalog.json`:
+
+- `bartowski/gemma-2-9b-it-GGUF` → Google's Gemma, not "bartowski"
+- `TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF` → Mistral AI
+- `bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF` → DeepSeek
+
+Company and family must be derived from the model **name** via a curated pattern table, never from the owner segment.
+
+#### Decisions locked in with the user during planning (do not relitigate mid-implementation)
+
+| Decision | Choice |
+|---|---|
+| Scan trigger | View opens **idle**; nothing runs until SCAN is clicked. Re-opening replays the last results rather than re-scanning. |
+| Result volume | **All** fitting models, **25 per page**, Google-style **numbered pager** (`‹ 1 2 3 … 7 ›`) at the bottom — not a "Show more" button. |
+| Editor tab | **Removed entirely.** `src/panel.ts` is deleted; the scan command focuses the sidebar view. |
+| Sort options | Recommended (default), Params ↓, Params ↑, Most downloaded, Size ↑, Name A–Z, Source site, Company of origin, Model family |
+
+**Files:**
+- Create: `src/models/taxonomy.ts` + `.test.ts`, `src/models/sort.ts` + `.test.ts`, `src/webview/paginate.ts` + `.test.ts`, `src/view.ts`, `media/sidebar-icon.svg`
+- Delete: `src/panel.ts`
+- Modify: `src/models/types.ts`, `constants.ts`, `score.ts`, `fetch.ts`, `gpt4all.ts`, `src/extension.ts`, `src/webview/{main,state,styles.css,bundle.test.ts}`, `package.json`, `tsconfig.webview.json`, `README.md`, `CHANGELOG.md`, `.claude/skills/model-recommendation-logic/SKILL.md`
+
+**Interfaces:**
+- Produces: `classifyModel(name: string): { family: string; company: string }` (`taxonomy.ts`); `sortModels(models: ScoredModel[], key: SortKey): ScoredModel[]` (`sort.ts`); `pageItems<T>(items, page, size): T[]` and `pageNumbers(current, total, window?): (number | '…')[]` (`paginate.ts`); `AdvisorViewProvider implements vscode.WebviewViewProvider` (`view.ts`).
+- Consumes: everything already in `src/models/types.ts`.
+
+- [ ] **Step 1: Data model — `provider`, `family`, `company`**
+
+```ts
+// src/models/types.ts
+export type ModelProvider = 'huggingface' | 'gpt4all';
+
+export interface ModelRecommendation {
+	/* …existing fields… */
+	provider: ModelProvider;      // which catalog it came from
+}
+
+export interface ScoredModel extends ModelRecommendation {
+	tier: FitTier;
+	score: number;
+	family: string;               // 'Llama' | 'Qwen' | 'GLM' | 'Kimi' | … | 'Other'
+	company: string;              // 'Meta' | 'Alibaba' | 'Google' | … | 'Unknown'
+}
+```
+
+`provider` is a fact about the source, so the **fetcher** sets it. `family`/`company` are *derived* presentation metadata, so they are attached during **scoring** — this deliberately keeps `catalog.json` and the `isModelRecommendation` guard untouched.
+
+Protocol changes in the same file: rename `WebviewToExtension` `{ type: 'rescan' }` → `{ type: 'scan' }` (the button reads "SCAN" before the first run), and add `{ type: 'ready' }`. `ExtensionToWebview` is unchanged.
+
+- [ ] **Step 2: `src/models/taxonomy.ts` (TDD)**
+
+An **ordered** array of `{ pattern: RegExp, family, company }` matched against the model **name**. Seed from the families actually present in the live pool and `catalog.json`:
+
+| Pattern | Family | Company |
+|---|---|---|
+| `llama`, `tinyllama` | Llama | Meta |
+| `qwen`, `qwq` | Qwen | Alibaba |
+| `gemma` | Gemma | Google |
+| `mistral`, `mixtral`, `magistral` | Mistral | Mistral AI |
+| `phi` | Phi | Microsoft |
+| `deepseek` | DeepSeek | DeepSeek |
+| `kimi` | Kimi | Moonshot AI |
+| `glm`, `chatglm` | GLM | Z.ai |
+| `gpt-oss` | GPT-OSS | OpenAI |
+| `granite` | Granite | IBM |
+| `nemotron` | Nemotron | NVIDIA |
+| `smollm` | SmolLM | Hugging Face |
+| `falcon` | Falcon | TII |
+| `yi-` | Yi | 01.AI |
+| *(no match)* | `Other` | `Unknown` |
+
+**Order matters and must be tested.** `DeepSeek-R1-Distill-Qwen-7B` matches both `deepseek` and `qwen` — DeepSeek must win, because it is the distributing family. Pin that exact case, plus `bartowski/gemma-2-9b-it-GGUF` → Google (proving the owner is ignored) and an unmatched name → `Other`/`Unknown`.
+
+- [ ] **Step 3: `src/models/sort.ts` (TDD)**
+
+```ts
+export type SortKey =
+	| 'recommended' | 'params-desc' | 'params-asc' | 'downloads'
+	| 'size-asc' | 'name' | 'provider' | 'company' | 'family';
+
+export function sortModels(models: ScoredModel[], key: SortKey): ScoredModel[];
+```
+
+Never mutate the input — return a copy. **Every comparator falls back to `score` descending on a tie**, so the grouping sorts (`provider`/`company`/`family`) still surface the best-fit model first inside each group; group names order A–Z. Test the tie-break explicitly — it is the part most likely to be dropped.
+
+- [ ] **Step 4: Fetchers set `provider`; raise the result ceiling**
+
+- `fetch.ts` — `provider: 'huggingface'` on each mapped row; `loadFallbackCatalog()` adds `provider: 'huggingface'` to validated rows (every `catalog.json` entry is a `huggingface.co` URL). The `isModelRecommendation` guard keeps validating the raw JSON shape and does **not** gain a `provider` check.
+- `gpt4all.ts` — `provider: 'gpt4all'`.
+- `constants.ts` — move `MAX_RESULTS` out of `score.ts`, set to **200**; add `PAGE_SIZE = 25`.
+- `score.ts` — keep the `none`-tier drop and score ordering, slice at the new `MAX_RESULTS`, attach `family`/`company` via `classifyModel`.
+- `fetch.ts` — raise HF `limit=100` → **`limit=200`**. ⚠️ **Verify at implementation time** that the endpoint honours the larger limit and still returns inside `TIMEOUT_MS` (10s). If it does not, fall back to 100 and say so — do not silently ship a timeout.
+
+Existing tests construct model literals and will fail to compile once `provider` is required. Updating them is mechanical — **do not weaken the types to avoid it.** Note `score.test.ts` currently asserts `toHaveLength(12)`; that assertion changes meaning and must be rewritten against `MAX_RESULTS`.
+
+- [ ] **Step 5: Sidebar view replaces the editor panel**
+
+`package.json` — add alongside the existing `commands`:
+
+```json
+"viewsContainers": {
+	"activitybar": [
+		{ "id": "localModelAdvisor", "title": "Local Model Advisor", "icon": "media/sidebar-icon.svg" }
+	]
+},
+"views": {
+	"localModelAdvisor": [
+		{ "id": "localModelAdvisor.advisorView", "name": "Recommendations", "type": "webview" }
+	]
+}
+```
+
+`contributes.views` auto-generates the `onView:` activation event, so `activationEvents` stays absent (per Global Constraints).
+
+`media/sidebar-icon.svg` — NEW. **`media/icon.svg` is not reusable**: it has a filled `#05060a` background rect and two accent colours, so it renders as a solid blob in the activity bar. The new file must be 24×24, single-colour, transparent-background stroke art (reuse the chip-outline motif; drop the background rect and the magenta core). `.vscodeignore` excludes the exact path `media/icon.svg`, so a new filename ships — but re-check the packaged file list.
+
+`src/view.ts` — `AdvisorViewProvider implements vscode.WebviewViewProvider`, replacing `src/panel.ts`. It must carry over **every** guarantee the panel already had; these are the shipped fixes for Part D's C1/I1/I2, and losing them silently re-opens fixed bugs:
+
+- registered with `{ webviewOptions: { retainContextWhenHidden: true } }`
+- `lastMessage` cached and replayed on `onDidChangeVisibility` when visible
+- `post()` short-circuits on a `disposed` flag set in `onDidDispose`
+- `beginScan()` / `isCurrentScan()` generation counter, unchanged
+- `getHtml()` moves over as-is — same strict CSP, same nonce, same `localResourceRoots: [dist]`
+
+**New: a `ready` handshake.** A view resolves *lazily*, so the command path (`focus` → scan) can post before the webview script has loaded — a race the old panel never had, because it created the panel synchronously. The webview posts `{ type: 'ready' }` on load; the host replays `lastMessage` on receipt. This is the robust fix; `retainContextWhenHidden` alone is not.
+
+`src/extension.ts` — `activate()` registers the provider into `context.subscriptions`; `local-model-advisor.scanHardware` runs `vscode.commands.executeCommand('localModelAdvisor.advisorView.focus')` (auto-registered for contributed views) then starts the scan; `scan` replaces `rescan` in `handleWebviewMessage`. The `openExternal`/`copy` allowlist in `src/validate.ts` is untouched.
+
+- [ ] **Step 6: Webview — idle state, sort dropdown, numeric pager**
+
+`src/webview/state.ts` — `filter` currently lives as a module-level `let` in `main.ts`, outside the tested reducer. Fold it into state with the new fields:
+
+```ts
+status: 'idle' | 'loading' | 'results' | 'error';   // 'idle' is new, and is initialState
+filter: FitTier | 'all';
+sort: SortKey;
+page: number;
+```
+
+Host messages keep flowing through `reduce`. Add a **separate pure** `applyUiAction(state, action)` for local interactions (`setFilter`/`setSort`/`setPage`) so UI state stays as testable as host state — do not overload `ExtensionToWebview` with UI concerns. **Changing filter or sort resets `page` to 1**; a stale page number on a shorter list is the obvious bug here, so test it.
+
+`src/webview/paginate.ts` (TDD) — `pageNumbers` is the Google-style windowed list: always show first and last, ellipsis for gaps, window of 5 around the current page. Test few pages (no ellipsis), current at start, current in middle (two ellipses), current at end, and `total === 0`.
+
+`src/webview/main.ts` — add `renderIdle()` (title, one-line blurb, pulsing SCAN button — the first thing users see); a sort `<select>` above the list populated from the 9 `SortKey`s with an `aria-label`; the pager below the list with `aria-current="page"` on the current page. **Sorting runs client-side** via `sortModels` — instant, no re-scan, no host round trip. Row meta gains family/company/provider. Cap the staggered `row-in` animation at the first ~12 rows (25 × 45ms is a 1.1s entrance).
+
+`tsconfig.webview.json` — `include` is currently `["src/webview", "src/models/types.ts"]`; add `src/models/sort.ts` and `src/models/constants.ts`. Keep it the only project with the `DOM` lib.
+
+`src/webview/styles.css` — the current layout targets an 860px editor tab and breaks at a ~300px sidebar. Restructure **narrow-first**, then restore the roomy layout at `@media (min-width: 520px)` (in a webview, media queries resolve against the sidebar width, so this responds to the user dragging it wider):
+
+| Selector | Narrow-first change |
+|---|---|
+| `#app` | drop `max-width: 860px`; padding `24px 20px` → `14px 12px` |
+| `.model-row` | `grid-template-columns: 34px 1fr auto` → stacked: rank+name, meta, then badge+copy on their own row |
+| `.hud-header` | `space-between` flex → stacked block |
+| `.hw-grid` | `minmax(180px, 1fr)` → single column |
+| `.sort-select`, `.pager` | NEW — full-width select; pager as a wrapping flex row of small square buttons |
+
+Everything in `.claude/skills/neon-webview-ui` still binds: exact tokens, corner-cut `clip-path` (not border-radius), semantic tier colours, `--mono` everywhere, zero external resources, `textContent`-only rendering, and a `prefers-reduced-motion` block covering any new animation. **Run that skill's 8-item lifecycle checklist against the new view before calling this done** — it was written for exactly this kind of change.
+
+- [ ] **Step 7: Docs and release**
+
+- `README.md` — Usage is no longer "Ctrl+Shift+P"; lead with the activity-bar icon, then the sort/pagination controls.
+- `CHANGELOG.md` — new `0.2.0` entry; `package.json` version `0.1.0` → `0.2.0`.
+- `.claude/skills/model-recommendation-logic` — document the `provider` field, the taxonomy table and its "name, never owner" rule, the tie-break-on-score sorting rule, and the new `MAX_RESULTS`/`PAGE_SIZE`.
+- **`media/screenshot.png`**: the README reference was removed on 2026-07-31 rather than left broken. Once Task 13's sidebar UI is stable, capture a screenshot of it and re-add the `![screenshot](media/screenshot.png)` line to `README.md`.
+
+- [ ] **Step 8: Verify**
+
+Per-module TDD first (failing test → implement → pass), per the model-recommendation-logic skill:
+
+```bash
+npx vitest run src/models/taxonomy.test.ts
+npx vitest run src/models/sort.test.ts
+npx vitest run src/webview/paginate.test.ts
+```
+
+Then the full gate — all must be clean:
+
+```bash
+npm run check-types     # both tsconfig projects
+npm run lint
+npm run test:unit       # currently 74 tests / 9 files; expect ~110+ / 12
+npm run compile         # must emit no esbuild warnings
+npm test                # real Electron host
+npx vsce package        # confirm media/sidebar-icon.svg IS included
+```
+
+`src/webview/bundle.test.ts` already builds and executes the real webview IIFE against a DOM stub — **extend it** rather than working around it: assert the idle screen renders the SCAN button, that a `models` message renders exactly 25 rows plus a pager, that changing sort reorders without a host round trip, and that page 2 shows different rows.
+
+**Manual pass (human-only):** F5 → click the activity-bar icon → idle screen with SCAN → click → results → change sort → page through → collapse the sidebar and re-open (results must **replay**, not reset to idle or strand on the radar) → disconnect the network and rescan for the amber offline banner.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git commit -m "feat: sidebar webview with paginated results and sorting"
+```
+
+#### Risks
+
+1. **`taxonomy.ts` is a hand-maintained list** that goes stale as new families ship. Unmatched names degrade to `Other`/`Unknown` rather than breaking — the right failure mode — but the sort is only as good as the table.
+2. **HF `limit=200` is unverified.** If the endpoint caps it or slows past `TIMEOUT_MS`, fall back to 100 and report it.
+3. **The view-lifecycle rewrite is where the shipped C1/I1/I2 fixes live.** Porting them is not optional, and the `ready` handshake is genuinely new surface — the riskiest part of this task after taxonomy.
+
+---
+
 ## Final verification checklist (state after fix wave 2, 2026-07-31)
 
 1. `npm run compile` — clean (both tsconfig projects + lint + dual bundle, no esbuild warnings). ✅ passing
@@ -2158,7 +2372,7 @@ Fix: cache the last `ExtensionToWebview` in `AdvisorPanel` and re-post it on `on
 
 ## D4 — Human-only tasks (2)
 
-1. **Capture `media/screenshot.png`** — F5 → run the scan command → screenshot the panel. `README.md:14` references it, so the link is broken until then. **Note:** capturing it locally is not sufficient — vsce rewrites relative README image paths against `repository`, so the Marketplace page will fetch `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png`. The repo must exist and the PNG must be committed and pushed, or the listing stays broken.
+1. **Capture `media/screenshot.png`** — F5 → open the sidebar → screenshot it. **Status 2026-07-31: the README reference was removed**, so there is no longer a broken link; this is now purely "add a screenshot when there is a stable UI to photograph" (i.e. after Task 13). **Note:** capturing it locally is not sufficient — vsce rewrites relative README image paths against `repository`, so the Marketplace page will fetch `https://raw.githubusercontent.com/VihaanR/local-model-advisor/HEAD/media/screenshot.png`. The PNG must be committed and pushed, or the listing stays broken.
 2. **Local `.vsix` install sanity pass** — `code --install-extension local-model-advisor-0.1.0.vsix`, then run the command once. (`code` was not on PATH in the build environment.)
 
 ## D5 — Task 11 tripwires — ✅ BOTH ADDRESSED in fix wave 2

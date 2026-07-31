@@ -11,8 +11,6 @@ GGUF models on Hugging Face, and ranks what your hardware can really run:
 
 Each recommendation ships with a one-click `ollama run hf.co/<model>` command.
 
-![screenshot](media/screenshot.png)
-
 ## Usage
 
 1. `Ctrl+Shift+P` → **Local Model Advisor: Scan Hardware & Recommend Models**
