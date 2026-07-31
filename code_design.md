@@ -14,7 +14,9 @@
 
 ### 🔴 RESUME HERE (next session)
 
-**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, committed (`ccb4613`), and PUSHED to `origin/master`** (along with doc update `62367ec`). The only remaining gates before publishing are D4 (2 human-only tasks: screenshot + local `.vsix` install check) and Task 11 (CI + Marketplace publish). Nothing else in Part D blocks release.
+**Fix wave 1 (C1 + I1–I6, all 7 ship-blocking findings from Part D) is DONE, reviewed, committed (`ccb4613`), and PUSHED to `origin/master`** (along with doc updates `62367ec`/`14b3677`). The only pre-existing gates before publishing are D4 (2 human-only tasks: screenshot + local `.vsix` install check) and Task 11 (CI + Marketplace publish).
+
+**New, not yet started: Task 12 — GPT4All as a second live catalog source.** Fully planned (search this file for "Task 12: Second live catalog source", in the Implementation Tasks section, right after Task 11) with exact code, TDD steps, and 5 locked-in design decisions, at the user's request to broaden the model pool beyond Hugging Face alone. Independent of Task 11/D4 — can be done in any order relative to those. Not yet dispatched to an implementer.
 
 What happened: a fix-wave implementer subagent was dispatched with a fully-specified brief (`.superpowers/sdd/fix-wave-1-brief.md`, still on disk, gitignored) covering all 7 items with exact code. It implemented all 7, flagged one deviation (the brief's own `MOE_ACTIVE_PATTERN` regex for I6 didn't satisfy the brief's own second test case for reversed MoE active/total ordering — verified independently by the controller with a scratch script before accepting), and committed as `ccb4613`. An independent task-reviewer subagent then re-ran `npm run check-types`/`lint`/`test:unit`/`compile` itself (not trusting the implementer's report), verified all 7 items against the brief item-by-item, confirmed the commit has no AI/Claude attribution, and confirmed zero scope creep. Verdict: **approved, task complete.**
 
@@ -80,9 +82,11 @@ Re-verified independently by the task reviewer after fix wave 1 (state as of com
 | *(post-review)* chore: broaden .gitignore | ✅ | `dc4eee6` |
 | *(post-review)* Push to GitHub remote | ✅ | — (push, not a commit) |
 | *(post-review)* docs: resume-here + repo-state update | ✅ | `de95372` |
-| *(post-review)* **Fix wave 1: C1 + I1–I6 (all 7 ship-blocking findings)** | ✅ implemented + independently reviewed, approved | `ccb4613` — **not yet pushed** |
+| *(post-review)* **Fix wave 1: C1 + I1–I6 (all 7 ship-blocking findings)** | ✅ implemented + independently reviewed, approved | `ccb4613` |
+| *(post-review)* docs: fix wave 1 status updates | ✅ | `62367ec`, `14b3677` |
+| **12 — GPT4All second live source** | 📋 planned, not started | — |
 
-Full commit range so far: `c136d34` (baseline) .. `ccb4613` (latest), 17 commits, all on `master`. **16 of 17 are pushed to `origin`; `ccb4613` is local-only, waiting on a push decision.**
+Full commit range so far: `c136d34` (baseline) .. `14b3677` (latest), 19 commits, all on `master`, all pushed to `origin`.
 
 Deviations from this plan that were made deliberately during execution, and why:
 
@@ -1729,6 +1733,351 @@ jobs:
 ```bash
 git add .github
 git commit -m "ci: build/test/package workflow and manual publish workflow"
+```
+
+---
+
+### Task 12: Second live catalog source — GPT4All — 📋 PLANNED (not started)
+
+> Not blocked on anything external. Independent of Task 11 — do in either order. Grew out of a user request to broaden the live model pool beyond Hugging Face alone. Two other candidates were investigated and rejected: Ollama's library has no official public API (only an unofficial third party at `ollamadb.dev`, which could not even be reached from the research environment to verify — not building on an unverifiable dependency); ModelScope has no documented public REST listing endpoint. GPT4All's catalog (`https://gpt4all.io/models/models3.json`) is real, public, no-auth, and was fetched and inspected directly during planning — every field/URL shape referenced below is from the actual live file, not assumed.
+
+**Design decisions locked in during planning (do not relitigate mid-implementation):**
+1. GPT4All catalog rows whose `url` is not a `huggingface.co/{owner}/{repo}/resolve/...` link are **skipped entirely** — confirmed against real data that some entries self-host on `gpt4all.io` (e.g. `Llama 3 8B Instruct` → `https://gpt4all.io/models/gguf/Meta-Llama-3-8B-Instruct.Q4_0.gguf`). The product's "Open on Hugging Face" button and `ollama run hf.co/{modelId}` copy command both require a real HF repo path; there is no fallback action for a non-HF file.
+2. `estimatedSizeGB` for GPT4All entries uses the catalog's own real `filesize` (bytes → GiB), not the `paramsB × Q4_GB_PER_B` estimate used for HF — this is more accurate since it's an actual measured file, not a guess.
+3. `minRamGB` for GPT4All entries is still computed with the project's own formula (`ceil((size + CPU_OVERHEAD_GB) / (1 - OS_RESERVE_FRACTION))`), **not** GPT4All's own `ramrequired` field, even though that field exists. Reason: mixing two different RAM-requirement methodologies across sources would silently reintroduce the exact inconsistency Part D's I3 fix just eliminated.
+4. GPT4All entries get `downloads: 0, likes: 0` (the catalog has no popularity data) — deliberately not faked. Per the existing scoring rule ("tier always dominates popularity"), this means a GPT4All entry only displaces an HF entry within the same tier when there's room left after more-downloaded HF entries. This is accepted as correct, honest behavior, not something to patch around.
+5. `getRecommendations`'s public signature and return shape are **unchanged** — `extension.ts`, `panel.ts`, and the webview need zero modifications. Merge/dedup happens entirely inside `src/models/`.
+
+**Files:**
+- Modify: `src/models/constants.ts` (add `TIMEOUT_MS`)
+- Create: `src/models/errors.ts` (extract `HttpError` + `classifyFetchError` out of `fetch.ts`)
+- Create: `src/models/dedupe.ts` + `src/models/dedupe.test.ts` (extract the name-based de-dup reducer out of `fetch.ts`)
+- Create: `src/models/gpt4all.ts` + `src/models/gpt4all.test.ts`
+- Modify: `src/models/fetch.ts` (use the extracted modules; `getRecommendations` becomes multi-source) + `src/models/fetch.test.ts` (new `getRecommendations` cases)
+- Modify: `.claude/skills/model-recommendation-logic/SKILL.md` (Data source policy section)
+
+**Interfaces:**
+- Consumes: `ModelRecommendation`, `HardwareInfo`, `CatalogSource`, `FetchFailureReason` from `./types`.
+- Produces: `fetchGpt4AllModels(opts?: { signal?: AbortSignal }): Promise<ModelRecommendation[]>` (`gpt4all.ts`); `dedupeByName(models: ModelRecommendation[]): ModelRecommendation[]` (`dedupe.ts`); `HttpError`, `classifyFetchError(err: unknown): FetchFailureReason` (`errors.ts`, re-exported from `fetch.ts` so existing `fetch.test.ts` imports of `HttpError`/`classifyFetchError` from `./fetch` keep working unchanged).
+
+- [ ] **Step 1: Add `TIMEOUT_MS` to `constants.ts`**
+
+```typescript
+export const CTX_HEADROOM_GB = 0.8;      // KV-cache/context room on top of weights
+export const CPU_OVERHEAD_GB = 2;        // runtime + context when running on CPU
+export const OS_RESERVE_FRACTION = 0.25; // leave a quarter of RAM to the OS
+export const Q4_GB_PER_B = 0.6;          // Q4 quantization: ~0.6 GB per billion params
+export const TIMEOUT_MS = 10_000;        // network timeout for any live catalog source
+```
+
+- [ ] **Step 2: Extract `src/models/errors.ts`** (moves `HttpError`/`classifyFetchError` out of `fetch.ts` so `gpt4all.ts` can use them without a circular import)
+
+```typescript
+import type { FetchFailureReason } from './types';
+
+export class HttpError extends Error {
+	constructor(public readonly status: number, message = `Request failed with status ${status}`) {
+		super(message);
+	}
+}
+
+export function classifyFetchError(err: unknown): FetchFailureReason {
+	if (err instanceof HttpError) {
+		if (err.status === 401 || err.status === 403) { return 'auth'; }
+		if (err.status === 429) { return 'rate-limit'; }
+		if (err.status >= 500) { return 'server'; }
+		return 'unknown';
+	}
+	if (err instanceof DOMException && err.name === 'AbortError') { return 'network'; }
+	if (err instanceof TypeError) { return 'network'; }
+	return 'unknown';
+}
+```
+
+In `fetch.ts`: delete the local `HttpError`/`classifyFetchError` definitions, add `import { HttpError, classifyFetchError } from './errors';` and `export { HttpError, classifyFetchError };` right after the imports. Change the throw site to `throw new HttpError(res.status, \`Hugging Face API returned ${res.status}\`);` (same text as before, now via the shared constructor's optional message param). Run `npx vitest run src/models/fetch.test.ts` — all existing tests (including the `classifyFetchError` describe block) must still pass unchanged, since the import path `from './fetch'` still resolves via the re-export.
+
+- [ ] **Step 3: Write `src/models/dedupe.test.ts` (failing first)**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { dedupeByName } from './dedupe';
+import type { ModelRecommendation } from './types';
+
+const rec = (name: string, downloads: number): ModelRecommendation => ({
+	name, modelId: `pub/${name}`, paramsB: 7, estimatedSizeGB: 4.2, minRamGB: 9, downloads, likes: 0,
+	hfUrl: `https://huggingface.co/pub/${name}`,
+});
+
+describe('dedupeByName', () => {
+	it('keeps the highest-download variant among same-name entries', () => {
+		const out = dedupeByName([rec('Llama-3.1-8B-Instruct-GGUF', 100), rec('Llama-3.1-8B-Instruct-GGUF', 5000)]);
+		expect(out).toHaveLength(1);
+		expect(out[0].downloads).toBe(5000);
+	});
+	it('is case/suffix/punctuation insensitive when matching names', () => {
+		const out = dedupeByName([rec('Foo-Bar-GGUF', 10), rec('foo bar', 20)]);
+		expect(out).toHaveLength(1);
+		expect(out[0].downloads).toBe(20);
+	});
+	it('keeps distinct models separate', () => {
+		const out = dedupeByName([rec('Alpha', 10), rec('Beta', 20)]);
+		expect(out).toHaveLength(2);
+	});
+});
+```
+
+Run: `npx vitest run src/models/dedupe.test.ts` — expect FAIL (`dedupe.ts` doesn't exist yet).
+
+- [ ] **Step 4: Implement `src/models/dedupe.ts`**
+
+```typescript
+import type { ModelRecommendation } from './types';
+
+function normalizeBaseName(name: string): string {
+	return name.toLowerCase().replace(/-gguf$/i, '').replace(/[^a-z0-9]+/g, '');
+}
+
+/** Collapses re-packaged/duplicate listings of the same underlying model, keeping the highest-download variant. */
+export function dedupeByName(models: ModelRecommendation[]): ModelRecommendation[] {
+	const bestByName = new Map<string, ModelRecommendation>();
+	for (const rec of models) {
+		const key = normalizeBaseName(rec.name);
+		const existing = bestByName.get(key);
+		if (!existing || rec.downloads > existing.downloads) {
+			bestByName.set(key, rec);
+		}
+	}
+	return Array.from(bestByName.values());
+}
+```
+
+Run: `npx vitest run src/models/dedupe.test.ts` — expect PASS (3/3).
+
+- [ ] **Step 5: Refactor `fetch.ts` to use `dedupe.ts` and `constants.ts`'s `TIMEOUT_MS`**
+
+Replace the inline `normalizeBaseName`/de-dup block at the end of `fetchLiveModels` with `return dedupeByName(out);` (import `dedupeByName` from `./dedupe`), delete the now-unused local `normalizeBaseName` function, replace the local `const TIMEOUT_MS = 10_000;` with an import from `./constants`, and replace the local `const CPU_OVERHEAD_GB = 2;` with imports of `CPU_OVERHEAD_GB, OS_RESERVE_FRACTION` from `./constants` (this was already the state after the Part D fix wave for `minRamGB`'s formula — just confirm the import list is `{ CPU_OVERHEAD_GB, OS_RESERVE_FRACTION, TIMEOUT_MS }` afterward). Run `npx vitest run src/models/fetch.test.ts` — all tests, including `'de-duplicates re-packaged models...'`, must still pass with zero test-file changes (behavior is identical, only the implementation moved).
+
+- [ ] **Step 6: Write `src/models/gpt4all.test.ts` (failing first)**
+
+```typescript
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { fetchGpt4AllModels } from './gpt4all';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('fetchGpt4AllModels', () => {
+	it('maps a Hugging-Face-hosted entry, using real filesize for estimatedSizeGB', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => [{
+				name: 'Reasoner v1',
+				url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_0.gguf',
+				filesize: '4431390720',
+				parameters: '8 billion',
+			}],
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const out = await fetchGpt4AllModels();
+		expect(out).toHaveLength(1);
+		expect(out[0]).toMatchObject({
+			name: 'Reasoner v1',
+			modelId: 'Qwen/Qwen2.5-Coder-7B-Instruct-GGUF',
+			paramsB: 8,
+			estimatedSizeGB: 4.1,
+			hfUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF',
+		});
+	});
+	it('parses decimal and million-scale parameter counts', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => [
+				{ name: 'Small', url: 'https://huggingface.co/a/Small-GGUF/resolve/main/s.gguf', filesize: '700000000', parameters: '770 million' },
+				{ name: 'Mid', url: 'https://huggingface.co/a/Mid-GGUF/resolve/main/m.gguf', filesize: '1068807776', parameters: '1.5 billion' },
+			],
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const out = await fetchGpt4AllModels();
+		expect(out.find((m) => m.name === 'Small')?.paramsB).toBeCloseTo(0.77);
+		expect(out.find((m) => m.name === 'Mid')?.paramsB).toBe(1.5);
+	});
+	it('skips entries not hosted on huggingface.co (no valid ollama command possible)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => [{ name: 'Llama 3 8B Instruct', url: 'https://gpt4all.io/models/gguf/Meta-Llama-3-8B-Instruct.Q4_0.gguf', filesize: '4661724384', parameters: '8 billion' }],
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		expect(await fetchGpt4AllModels()).toHaveLength(0);
+	});
+	it('skips entries with unparseable parameters or missing filesize', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => [
+				{ name: 'NoParams', url: 'https://huggingface.co/a/NoParams-GGUF/resolve/main/n.gguf', filesize: '4000000000' },
+				{ name: 'NoSize', url: 'https://huggingface.co/a/NoSize-GGUF/resolve/main/n.gguf', parameters: '7 billion' },
+			],
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		expect(await fetchGpt4AllModels()).toHaveLength(0);
+	});
+	it('throws an HttpError on a non-OK response', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+		await expect(fetchGpt4AllModels()).rejects.toThrow('503');
+	});
+});
+```
+
+Run: `npx vitest run src/models/gpt4all.test.ts` — expect FAIL (`gpt4all.ts` doesn't exist yet).
+
+- [ ] **Step 7: Implement `src/models/gpt4all.ts`**
+
+```typescript
+import { CPU_OVERHEAD_GB, OS_RESERVE_FRACTION, TIMEOUT_MS } from './constants';
+import { HttpError } from './errors';
+import type { ModelRecommendation } from './types';
+
+const GPT4ALL_ENDPOINT = 'https://gpt4all.io/models/models3.json';
+const HF_RESOLVE_PATTERN = /^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\//i;
+const PARAMS_PATTERN = /^([\d.]+)\s*(billion|million)\b/i;
+
+interface Gpt4AllRow {
+	name?: string;
+	url?: string;
+	filesize?: string;
+	parameters?: string;
+}
+
+function parseParamsB(raw: string | undefined): number | null {
+	if (!raw) { return null; }
+	const m = raw.match(PARAMS_PATTERN);
+	if (!m) { return null; }
+	const n = parseFloat(m[1]);
+	return m[2].toLowerCase() === 'million' ? n / 1000 : n;
+}
+
+export async function fetchGpt4AllModels(
+	opts: { signal?: AbortSignal } = {}
+): Promise<ModelRecommendation[]> {
+	const res = await fetch(GPT4ALL_ENDPOINT, {
+		signal: opts.signal ?? AbortSignal.timeout(TIMEOUT_MS),
+	});
+	if (!res.ok) {
+		throw new HttpError(res.status, `GPT4All catalog returned ${res.status}`);
+	}
+	const rows = (await res.json()) as Gpt4AllRow[];
+	const out: ModelRecommendation[] = [];
+	for (const row of rows) {
+		const urlMatch = row.url?.match(HF_RESOLVE_PATTERN);
+		if (!urlMatch) {
+			continue; // not Hugging-Face-hosted — no valid "ollama run hf.co/..." command is possible
+		}
+		const modelId = urlMatch[1];
+		const paramsB = parseParamsB(row.parameters);
+		const filesizeBytes = row.filesize ? Number(row.filesize) : NaN;
+		if (paramsB === null || !Number.isFinite(filesizeBytes) || filesizeBytes <= 0) {
+			continue;
+		}
+		const estimatedSizeGB = Math.round((filesizeBytes / 1024 ** 3) * 10) / 10;
+		out.push({
+			name: row.name ?? modelId.split('/').pop() ?? modelId,
+			modelId,
+			paramsB,
+			estimatedSizeGB,
+			minRamGB: Math.ceil((estimatedSizeGB + CPU_OVERHEAD_GB) / (1 - OS_RESERVE_FRACTION)),
+			downloads: 0,
+			likes: 0,
+			hfUrl: `https://huggingface.co/${modelId}`,
+		});
+	}
+	return out;
+}
+```
+
+Run: `npx vitest run src/models/gpt4all.test.ts` — expect PASS (5/5).
+
+- [ ] **Step 8: Rewrite `getRecommendations` in `fetch.ts` for multi-source merge**
+
+```typescript
+export async function getRecommendations(
+	hw: HardwareInfo,
+	opts: { token?: string } = {}
+): Promise<{ models: ScoredModel[]; source: CatalogSource; reason?: FetchFailureReason }> {
+	const [hfResult, gpt4AllResult] = await Promise.allSettled([
+		fetchLiveModels(opts),
+		fetchGpt4AllModels(),
+	]);
+
+	const live: ModelRecommendation[] = [
+		...(hfResult.status === 'fulfilled' ? hfResult.value : []),
+		...(gpt4AllResult.status === 'fulfilled' ? gpt4AllResult.value : []),
+	];
+
+	if (live.length > 0) {
+		return { models: scoreModels(dedupeByName(live), hw), source: 'live' };
+	}
+
+	const primaryError = hfResult.status === 'rejected' ? hfResult.reason
+		: gpt4AllResult.status === 'rejected' ? gpt4AllResult.reason
+		: undefined;
+	return { models: scoreModels(loadFallbackCatalog(), hw), source: 'fallback', reason: classifyFetchError(primaryError) };
+}
+```
+
+Add `import { fetchGpt4AllModels } from './gpt4all';` to `fetch.ts`. Note `scoreModels(...)` here still sits outside any try/catch — `Promise.allSettled` never throws for individual source failures, and a genuine `scoreModels` bug still propagates as a real error rather than being reported as "offline," preserving Part D's I4 fix.
+
+Add to `fetch.test.ts`'s `describe('getRecommendations', ...)` block (the existing `'falls back to the bundled catalog when the network fails'` test needs NO change — its single fetch mock rejects unconditionally, which now correctly fails both sources and still exercises the fallback path):
+
+```typescript
+it('merges Hugging Face and GPT4All results into one live pool', async () => {
+	const fetchMock = vi.fn(async (url: string) => {
+		if (url.includes('gpt4all.io')) {
+			return { ok: true, json: async () => [{
+				name: 'Foo Model',
+				url: 'https://huggingface.co/someone/Foo-Model-GGUF/resolve/main/foo.Q4_0.gguf',
+				filesize: '4000000000',
+				parameters: '7 billion',
+			}] };
+		}
+		return { ok: true, json: async () => [{ modelId: 'bartowski/Bar-Model-8B-GGUF', downloads: 50, likes: 1 }] };
+	});
+	vi.stubGlobal('fetch', fetchMock);
+	const { models, source } = await getRecommendations(hw);
+	expect(source).toBe('live');
+	const names = models.map((m) => m.name);
+	expect(names).toContain('Foo Model');
+	expect(names.some((n) => n.includes('Bar-Model'))).toBe(true);
+});
+
+it('still returns a live pool from whichever source succeeds if the other fails', async () => {
+	const fetchMock = vi.fn(async (url: string) => {
+		if (url.includes('gpt4all.io')) { throw new Error('gpt4all down'); }
+		return { ok: true, json: async () => [{ modelId: 'bartowski/Bar-Model-8B-GGUF', downloads: 50, likes: 1 }] };
+	});
+	vi.stubGlobal('fetch', fetchMock);
+	const { models, source } = await getRecommendations(hw);
+	expect(source).toBe('live');
+	expect(models.length).toBeGreaterThan(0);
+});
+```
+
+Run: `npx vitest run src/models/fetch.test.ts` — expect PASS, all tests (existing + 2 new).
+
+- [ ] **Step 9: Update `.claude/skills/model-recommendation-logic/SKILL.md`'s "Data source policy" section**
+
+Replace the existing three-bullet section with one documenting both sources, the merge/dedup behavior, the `minRamGB`-formula-always-wins rule, and the deliberate `downloads: 0` choice for GPT4All (content: the five numbered design decisions at the top of this task, condensed into skill-doc form).
+
+- [ ] **Step 10: Full verification + commit**
+
+```bash
+npm run check-types && npm run lint && npm run test:unit && npm run compile && npm test
+```
+
+Expect: all clean, `test:unit` file count now 7 (`estimate`, `score`, `fetch`, `hardware`, `state`, `dedupe`, `gpt4all`).
+
+```bash
+git add src/models/constants.ts src/models/errors.ts src/models/dedupe.ts src/models/dedupe.test.ts \
+        src/models/gpt4all.ts src/models/gpt4all.test.ts src/models/fetch.ts src/models/fetch.test.ts \
+        .claude/skills/model-recommendation-logic/SKILL.md
+git commit -m "feat: add GPT4All as a second live catalog source, merged and de-duped with Hugging Face"
 ```
 
 ---
